@@ -59,47 +59,51 @@ final class PlaybackIntegrationTests: XCTestCase {
         return (samples.reduce(0.0) { $0 + Double($1 * $1) } / Double(samples.count)).squareRoot()
     }
 
-    func testPlayPauseAndSelectionDriveTheRealEngine() {
-        let output = RenderingOutput()
-        let controller = PlaybackController(store: SettingsStore(storage: InMemoryStorage()), output: output)
+    nonisolated func testPlayPauseAndSelectionDriveTheRealEngine() {
+        onMainActor {
+            let output = RenderingOutput()
+            let controller = PlaybackController(store: SettingsStore(storage: InMemoryStorage()), output: output)
 
-        XCTAssertTrue(output.pull(seconds: 1).isEmpty, "Nothing renders before Play")
+            XCTAssertTrue(output.pull(seconds: 1).isEmpty, "Nothing renders before Play")
 
-        controller.play()
-        let playing = output.pull(seconds: 2)
-        XCTAssertLessThan(abs(playing[0]), 1e-4, "Starts from silence")
-        XCTAssertGreaterThan(rms(playing.suffix(24_000)), 0.01, "Audible after the fade-in")
-        XCTAssertTrue(playing.allSatisfy { $0.isFinite && abs($0) < 0.97 })
+            controller.play()
+            let playing = output.pull(seconds: 2)
+            XCTAssertLessThan(abs(playing[0]), 1e-4, "Starts from silence")
+            XCTAssertGreaterThan(rms(playing.suffix(24_000)), 0.01, "Audible after the fade-in")
+            XCTAssertTrue(playing.allSatisfy { $0.isFinite && abs($0) < 0.97 })
 
-        controller.pause()
-        let pausing = output.pull(seconds: 1)
-        XCTAssertTrue(pausing.suffix(4_800).allSatisfy { $0 == 0 }, "Fades to true silence")
-        XCTAssertFalse(output.isRunning, "The engine stops once silent (no work while paused)")
+            controller.pause()
+            let pausing = output.pull(seconds: 1)
+            XCTAssertTrue(pausing.suffix(4_800).allSatisfy { $0 == 0 }, "Fades to true silence")
+            XCTAssertFalse(output.isRunning, "The engine stops once silent (no work while paused)")
 
-        controller.select(.airVent)
-        XCTAssertTrue(output.pull(seconds: 1).isEmpty, "Selecting while paused stays silent")
-        XCTAssertFalse(controller.isPlaying)
+            controller.select(.airVent)
+            XCTAssertTrue(output.pull(seconds: 1).isEmpty, "Selecting while paused stays silent")
+            XCTAssertFalse(controller.isPlaying)
 
-        controller.play()
-        let resumed = output.pull(seconds: 2)
-        XCTAssertGreaterThan(rms(resumed.suffix(24_000)), 0.01)
-        controller.select(.deepDrift)
-        let crossfade = output.pull(seconds: 2)
-        XCTAssertGreaterThan(rms(crossfade[0 ..< 48_000]), 0.005, "No gap while switching presets")
-        XCTAssertTrue(controller.isPlaying)
+            controller.play()
+            let resumed = output.pull(seconds: 2)
+            XCTAssertGreaterThan(rms(resumed.suffix(24_000)), 0.01)
+            controller.select(.deepDrift)
+            let crossfade = output.pull(seconds: 2)
+            XCTAssertGreaterThan(rms(crossfade[0 ..< 48_000]), 0.005, "No gap while switching presets")
+            XCTAssertTrue(controller.isPlaying)
+        }
     }
 
-    func testInterruptedPlaybackRestartsFromSilence() {
-        let output = RenderingOutput()
-        let controller = PlaybackController(store: SettingsStore(storage: InMemoryStorage()), output: output)
-        controller.play()
-        _ = output.pull(seconds: 2)
-        // The system stops the engine mid-signal.
-        output.resetAfterSystemStop()
-        controller.interruptionBegan()
-        controller.interruptionEnded(shouldResume: true)
-        let resumed = output.pull(seconds: 0.5)
-        XCTAssertLessThan(abs(resumed[0]), 1e-4, "Resuming must fade in, not jump back to full level")
-        XCTAssertGreaterThan(rms(resumed.suffix(4_800)), 0.002)
+    nonisolated func testInterruptedPlaybackRestartsFromSilence() {
+        onMainActor {
+            let output = RenderingOutput()
+            let controller = PlaybackController(store: SettingsStore(storage: InMemoryStorage()), output: output)
+            controller.play()
+            _ = output.pull(seconds: 2)
+            // The system stops the engine mid-signal.
+            output.resetAfterSystemStop()
+            controller.interruptionBegan()
+            controller.interruptionEnded(shouldResume: true)
+            let resumed = output.pull(seconds: 0.5)
+            XCTAssertLessThan(abs(resumed[0]), 1e-4, "Resuming must fade in, not jump back to full level")
+            XCTAssertGreaterThan(rms(resumed.suffix(4_800)), 0.002)
+        }
     }
 }

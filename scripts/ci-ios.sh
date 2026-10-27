@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Builds Lowdrift for the iOS Simulator and runs the simulator test targets.
-#   scripts/ci-ios.sh            build + LowdriftAudioTests + LowdriftUITests
-#   scripts/ci-ios.sh --all      also the DSP and Core package tests (slow in Debug)
+# Builds Lowdrift for the iOS Simulator and runs the simulator tests.
+#   scripts/ci-ios.sh            app build + LowdriftUITests + LowdriftAudioTests (package)
+#   scripts/ci-ios.sh --all      every LowdriftKit test target in the simulator (slow in Debug)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -40,18 +40,42 @@ grep -E "error:|warning:" build/xcodebuild-build.log | sort -u | head -200 || tr
 tail -n 5 build/xcodebuild-build.log
 [ "$code" -eq 0 ] || exit "$code"
 
-# The built app: background audio declared, nothing network/tracking-related linked.
+# The built app: background audio declared, App Intents metadata extracted (so
+# Shortcuts and Siri see the intents), nothing network/tracking-related linked.
 app=$(find "$derived/Build/Products" -maxdepth 2 -name Lowdrift.app -type d | head -1)
 plutil -extract UIBackgroundModes json -o - "$app/Info.plist"
-if otool -L "$app/Lowdrift" | grep -E "Network.framework|StoreKit|AdSupport|AppTrackingTransparency|CoreLocation|WebKit"; then
-    echo "Unexpected framework linked" >&2
+if [ ! -d "$app/Metadata.appintents" ]; then
+    echo "App Intents metadata missing from the app bundle" >&2
     exit 1
 fi
-echo "Linked frameworks:"
-otool -L "$app/Lowdrift" | sed 1d
+echo "App Intents metadata: $(ls "$app/Metadata.appintents" | tr '\n' ' ')"
+# Debug builds keep the code in Lowdrift.debug.dylib; check whichever binaries exist.
+for binary in "$app/Lowdrift" "$app/Lowdrift.debug.dylib"; do
+    [ -f "$binary" ] || continue
+    echo "Linked by $(basename "$binary"):"
+    otool -L "$binary" | sed 1d
+    if otool -L "$binary" | grep -E "Network.framework|StoreKit|AdSupport|AppTrackingTransparency|CoreLocation|WebKit"; then
+        echo "Unexpected framework linked" >&2
+        exit 1
+    fi
+done
 
-only=(-only-testing:LowdriftAudioTests -only-testing:LowdriftUITests)
+xcodebuild "${common[@]}" test-without-building -only-testing:LowdriftUITests -resultBundlePath build/UITests.xcresult
+
+# LowdriftKit's tests in the simulator: the real AVAudioSourceNode render block
+# inside AVAudioEngine on iOS (the DSP and Core tests also run with `swift test`).
+package_scheme=$(cd LowdriftKit && xcodebuild -list -json 2>/dev/null | python3 -c '
+import json, sys
+text = sys.stdin.read()
+data = json.loads(text[text.index("{"):])
+schemes = [s for v in data.values() if isinstance(v, dict) for s in v.get("schemes", [])]
+print("LowdriftKit-Package" if "LowdriftKit-Package" in schemes else "LowdriftKit")
+print(f"Package schemes: {schemes}", file=sys.stderr)
+')
+only=(-only-testing:LowdriftAudioTests)
 if [ "${1:-}" = "--all" ]; then
     only=()
 fi
-xcodebuild "${common[@]}" test-without-building ${only[@]+"${only[@]}"} -resultBundlePath build/Tests.xcresult
+(cd LowdriftKit && xcodebuild -scheme "$package_scheme" -destination "id=$udid" \
+    -derivedDataPath ../build/PackageDerivedData test ${only[@]+"${only[@]}"} \
+    -resultBundlePath ../build/PackageTests.xcresult)

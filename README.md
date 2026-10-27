@@ -31,16 +31,16 @@ runs on iOS 17 and later, on iPhone.
 
 | What | How | Covers |
 |---|---|---|
-| Sound engine and app logic | `cd LowdriftKit && swift test` (macOS or Linux), or ⌘U in Xcode | Output bounds and non-silence, no clipping/DC/NaN, slider ranges, loudness matching, independence of the three controls, fades, crossfades, glides, restarts, sustained generation (2 min in Debug, 10 min in Release), no repetition, render cost, persistence, reset, corrupt settings, playback state machine, interruptions, route loss, retry, palette contrast |
-| AVAudioEngine integration | `swift test` on macOS, or ⌘U in Xcode | The real `AVAudioSourceNode` render block inside a real `AVAudioEngine` (offline manual rendering) |
-| App UI | ⌘U in Xcode (LowdriftUITests) | Fresh install opens on Basement AC, paused; six cards; selecting while paused stays paused; exactly three sliders; edits survive relaunch; Reset affects only that sound |
+| Sound engine and app logic | `cd LowdriftKit && swift test` (macOS or Linux), or open `LowdriftKit/Package.swift` in Xcode and press ⌘U | Output bounds and non-silence, no clipping/DC/NaN, slider ranges, loudness matching, independence of the three controls, fades, crossfades, glides, restarts, sustained generation (2 min in Debug, 10 min in Release), no repetition, render cost, persistence, reset, corrupt settings, playback state machine, interruptions, route loss, retry, palette contrast |
+| AVAudioEngine integration | `swift test` on macOS, or the LowdriftKit package in Xcode on an iPhone simulator | The real `AVAudioSourceNode` render block inside a real `AVAudioEngine` (offline manual rendering): stereo and mono outputs, the same signal on every channel, unity gain through the mixer |
+| App UI | ⌘U in `Lowdrift.xcodeproj` (the Lowdrift scheme runs LowdriftUITests) | Fresh install opens on Basement AC, paused; six cards; selecting while paused stays paused; exactly three sliders; edits survive relaunch; Reset affects only that sound |
 | Eight-hour render | `cd LowdriftKit && LOWDRIFT_OVERNIGHT_TEST=1 swift test -c release --filter testOvernightRenderStaysClean` | Eight simulated hours rendered offline: no NaN, peak below the limiter ceiling, minute-to-minute level steady |
 | Privacy | `./scripts/privacy-audit.sh` | No network, tracking, recording, purchase or logging APIs in shipped code, no permission keys, empty privacy manifest |
 
-CI (`.github/workflows/ci.yml`) runs the package tests on Linux and macOS,
-builds the app for the iOS Simulator with the newest installed Xcode, checks the
-built app's Info.plist and linked frameworks, and runs the UI and engine tests
-in the simulator (`scripts/ci-ios.sh`).
+CI (`.github/workflows/ci.yml`) runs the package tests on Linux and macOS. It
+also builds the app for the iOS Simulator with the newest installed Xcode, checks
+the built app's Info.plist, App Intents metadata and linked frameworks, and runs
+the UI tests and the AVAudioEngine tests in the simulator (`scripts/ci-ios.sh`).
 
 ### Listening without the app
 

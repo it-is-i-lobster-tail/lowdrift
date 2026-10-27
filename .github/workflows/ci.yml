@@ -55,6 +55,7 @@ jobs:
         with:
           name: ios-test-results
           path: |
-            build/Tests.xcresult
+            build/UITests.xcresult
+            build/PackageTests.xcresult
             build/xcodebuild-build.log
           if-no-files-found: ignore
