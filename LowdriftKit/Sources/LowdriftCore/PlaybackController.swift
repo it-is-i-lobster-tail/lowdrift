@@ -60,7 +60,7 @@ public final class PlaybackController {
     public private(set) var failure: PlaybackFailure?
 
     /// Called after play state or the selected preset changes (drives Now Playing).
-    @ObservationIgnored public var onStateChange: (() -> Void)?
+    @ObservationIgnored public var onStateChange: (@MainActor () -> Void)?
 
     private let store: SettingsStore
     private let output: AudioOutput
@@ -108,6 +108,22 @@ public final class PlaybackController {
     public func setDepth(_ value: Double) { updateControls { $0.depth = value } }
     public func setAirflow(_ value: Double) { updateControls { $0.airflow = value } }
     public func setHum(_ value: Double) { updateControls { $0.hum = value } }
+
+    // Two-way accessors for sliders (0–100); setting applies and saves the value.
+    public var depth: Double {
+        get { controls.depth }
+        set { setDepth(newValue) }
+    }
+
+    public var airflow: Double {
+        get { controls.airflow }
+        set { setAirflow(newValue) }
+    }
+
+    public var hum: Double {
+        get { controls.hum }
+        set { setHum(newValue) }
+    }
 
     /// Restores the selected preset's shipping values (only that preset).
     public func resetToDefault() {
