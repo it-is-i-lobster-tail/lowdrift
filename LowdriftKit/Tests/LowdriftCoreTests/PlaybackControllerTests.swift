@@ -40,7 +40,7 @@ final class PlaybackControllerTests: XCTestCase {
 
     override func setUp() async throws {
         storage = InMemoryStorage()
-        output = await FakeOutput()
+        output = FakeOutput()
     }
 
     private func makeController() -> PlaybackController {
@@ -250,5 +250,22 @@ final class PlaybackControllerTests: XCTestCase {
             }
             XCTAssertEqual(controller.isPlaying, output.isRunning)
         }
+    }
+}
+
+@MainActor
+final class SliderAccessorTests: XCTestCase {
+    func testSliderAccessorsApplyAndSave() {
+        let storage = InMemoryStorage()
+        let output = FakeOutput()
+        let controller = PlaybackController(store: SettingsStore(storage: storage), output: output)
+        controller.depth = 22
+        controller.airflow = 44
+        controller.hum = 66
+        XCTAssertEqual(controller.controls, SoundControls(depth: 22, airflow: 44, hum: 66))
+        XCTAssertEqual(output.sound?.controls, controller.controls)
+        XCTAssertEqual(SettingsStore(storage: storage).controls(for: .basementAC), controller.controls)
+        controller.hum = .nan
+        XCTAssertEqual(controller.hum, 66, "Invalid slider values are ignored")
     }
 }

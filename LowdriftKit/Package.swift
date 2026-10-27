@@ -1,10 +1,11 @@
 // swift-tools-version: 5.9
 //
-// LowdriftKit holds everything in Lowdrift that does not need UIKit, SwiftUI or
-// AVFoundation: the procedural sound engine, preset definitions, on-device
-// settings and the playback state machine. Keeping it platform-neutral lets the
-// DSP and logic tests run with `swift test` on any machine with a Swift
-// toolchain, in addition to running inside Xcode.
+// LowdriftKit holds everything in Lowdrift except the SwiftUI screens and App
+// Intents: the procedural sound engine, preset definitions, on-device settings,
+// the playback state machine, and the AVAudioEngine / audio session / Now
+// Playing glue. Everything but LowdriftAudio is platform-neutral, so the DSP and
+// logic tests run with `swift test` on any machine with a Swift toolchain, in
+// addition to running inside Xcode.
 
 import PackageDescription
 
@@ -12,7 +13,7 @@ let package = Package(
     name: "LowdriftKit",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
-        .library(name: "LowdriftKit", targets: ["LowdriftCore", "LowdriftDSP"]),
+        .library(name: "LowdriftKit", targets: ["LowdriftCore", "LowdriftDSP", "LowdriftAudio"]),
         // Developer tool: renders presets to WAV files for listening and tuning.
         .executable(name: "lowdrift-render", targets: ["LowdriftRender"]),
     ],
@@ -21,6 +22,8 @@ let package = Package(
         .target(name: "LDAtomics"),
         .target(name: "LowdriftDSP", dependencies: ["LDAtomics"]),
         .target(name: "LowdriftCore", dependencies: ["LowdriftDSP"]),
+        // AVAudioEngine output, audio session handling and Now Playing (Apple platforms only).
+        .target(name: "LowdriftAudio", dependencies: ["LowdriftCore", "LowdriftDSP"]),
         // Offline measurement helpers (FFT, band levels, loudness) for tests and the render tool.
         .target(name: "LowdriftAnalysis", dependencies: ["LowdriftDSP"]),
         .executableTarget(
@@ -32,5 +35,6 @@ let package = Package(
             dependencies: ["LowdriftDSP", "LowdriftCore", "LowdriftAnalysis"]
         ),
         .testTarget(name: "LowdriftCoreTests", dependencies: ["LowdriftCore", "LowdriftDSP"]),
+        .testTarget(name: "LowdriftAudioTests", dependencies: ["LowdriftAudio", "LowdriftCore", "LowdriftDSP"]),
     ]
 )
