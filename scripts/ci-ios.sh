@@ -43,18 +43,21 @@ tail -n 5 build/xcodebuild-build.log
 # The built app: background audio declared, App Intents metadata extracted (so
 # Shortcuts and Siri see the intents), nothing network/tracking-related linked.
 app=$(find "$derived/Build/Products" -maxdepth 2 -name Lowdrift.app -type d | head -1)
-plutil -extract UIBackgroundModes json -o - "$app/Info.plist"
+echo "UIBackgroundModes: $(plutil -extract UIBackgroundModes json -o - "$app/Info.plist")"
 if [ ! -d "$app/Metadata.appintents" ]; then
     echo "App Intents metadata missing from the app bundle" >&2
     exit 1
 fi
 echo "App Intents metadata: $(ls "$app/Metadata.appintents" | tr '\n' ' ')"
-# Debug builds keep the code in Lowdrift.debug.dylib; check whichever binaries exist.
+# Debug builds keep the code in Lowdrift.debug.dylib; check whichever binaries
+# exist. Only frameworks count: Swift overlays such as libswiftCoreLocation are
+# weak-linked automatically through system modules' own imports.
+forbidden='/(Network|StoreKit|AdSupport|AppTrackingTransparency|CoreLocation|WebKit)\.framework/'
 for binary in "$app/Lowdrift" "$app/Lowdrift.debug.dylib"; do
     [ -f "$binary" ] || continue
     echo "Linked by $(basename "$binary"):"
     otool -L "$binary" | sed 1d
-    if otool -L "$binary" | grep -E "Network.framework|StoreKit|AdSupport|AppTrackingTransparency|CoreLocation|WebKit"; then
+    if otool -L "$binary" | grep -E "$forbidden"; then
         echo "Unexpected framework linked" >&2
         exit 1
     fi
