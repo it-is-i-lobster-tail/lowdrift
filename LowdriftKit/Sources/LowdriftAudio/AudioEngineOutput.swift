@@ -7,7 +7,8 @@ import LowdriftDSP
 ///
 /// The engine only runs while sound is wanted: after a pause fade finishes it is
 /// stopped, so a paused Lowdrift does no audio work at all. The graph is a single
-/// mono source node at the hardware sample rate feeding the main mixer.
+/// source node at the hardware sample rate feeding the main mixer. It carries the
+/// mono sound on both channels (or one, on a mono route).
 @MainActor
 public final class AudioEngineOutput: AudioOutput {
     private let session = AVAudioSession.sharedInstance()
@@ -15,6 +16,7 @@ public final class AudioEngineOutput: AudioOutput {
     private var engine = AVAudioEngine()
     private var sourceNode: AVAudioSourceNode?
     private var graphSampleRate: Double = 0
+    private var graphChannels: AVAudioChannelCount = 0
     private var categoryConfigured = false
     private var stopTask: Task<Void, Never>?
 
@@ -112,22 +114,27 @@ public final class AudioEngineOutput: AudioOutput {
     }
 
     private func buildGraphIfNeeded() throws {
-        var rate = engine.outputNode.outputFormat(forBus: 0).sampleRate
-        if sourceNode != nil, rate == graphSampleRate { return }
-        if sourceNode != nil {
-            // The hardware rate changed while stopped: start over with a fresh engine.
-            resetEngine()
-            rate = engine.outputNode.outputFormat(forBus: 0).sampleRate
+        var hardware = engine.outputNode.outputFormat(forBus: 0)
+        if sourceNode != nil, hardware.sampleRate == graphSampleRate,
+           ProceduralSource.channelCount(forOutputChannels: hardware.channelCount) == graphChannels {
+            return
         }
-        if !(rate > 0) { rate = session.sampleRate }
+        if sourceNode != nil {
+            // The hardware format changed while stopped: start over with a fresh engine.
+            resetEngine()
+            hardware = engine.outputNode.outputFormat(forBus: 0)
+        }
+        let rate = hardware.sampleRate > 0 ? hardware.sampleRate : session.sampleRate
+        let channels = ProceduralSource.channelCount(forOutputChannels: hardware.channelCount)
         renderer.setSampleRate(rate)
-        guard let node = ProceduralSource.makeNode(renderer: renderer, sampleRate: rate) else {
+        guard let node = ProceduralSource.makeNode(renderer: renderer, sampleRate: rate, channels: channels) else {
             throw PlaybackFailure.couldNotStart
         }
         engine.attach(node)
         engine.connect(node, to: engine.mainMixerNode, format: node.outputFormat(forBus: 0))
         sourceNode = node
         graphSampleRate = rate
+        graphChannels = channels
     }
 
     private func resetEngine() {
@@ -137,6 +144,7 @@ public final class AudioEngineOutput: AudioOutput {
         }
         sourceNode = nil
         graphSampleRate = 0
+        graphChannels = 0
         engine = AVAudioEngine()
         renderer.prepareForRestart()
     }

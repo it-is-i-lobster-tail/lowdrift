@@ -34,39 +34,6 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "LowdriftCoreTests"
-               BuildableName = "LowdriftCoreTests"
-               BlueprintName = "LowdriftCoreTests"
-               ReferencedContainer = "container:LowdriftKit">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "LowdriftDSPTests"
-               BuildableName = "LowdriftDSPTests"
-               BlueprintName = "LowdriftDSPTests"
-               ReferencedContainer = "container:LowdriftKit">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "LowdriftAudioTests"
-               BuildableName = "LowdriftAudioTests"
-               BlueprintName = "LowdriftAudioTests"
-               ReferencedContainer = "container:LowdriftKit">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
                BlueprintIdentifier = "1D0000000000000000000040"
                BuildableName = "LowdriftUITests.xctest"
                BlueprintName = "LowdriftUITests"
