@@ -1,0 +1,18 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+build/
+
+# Rendered listening previews from `lowdrift-render`
+previews/
+*.wav
+
+.DS_Store
+.build-*/
