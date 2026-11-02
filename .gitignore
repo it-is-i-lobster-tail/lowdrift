@@ -16,3 +16,6 @@ previews/
 
 .DS_Store
 .build-*/
+
+# Written by ci_scripts/ci_post_clone.sh in Xcode Cloud
+TestFlight/
