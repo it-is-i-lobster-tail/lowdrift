@@ -9,6 +9,10 @@ It is not a DAW. Read the README for the layout and how to test.
 - No ads, subscriptions, purchases, accounts, tracking, analytics, servers,
   networking, microphone or permission prompts. Settings stay on the device
   (UserDefaults). `scripts/privacy-audit.sh` must keep passing.
+- Never put the owner's personal information (name, email, local paths such as
+  `/Users/<name>`) in code, comments, commit messages, commit authors or
+  trailers, branch names, or PR titles and bodies. PR bodies carry no
+  "Requested by" line. `scripts/personal-info-check.sh` must keep passing.
 - Swift and SwiftUI with Apple frameworks only; no third-party packages in the
   app.
 - One main screen and one native Customize sheet:

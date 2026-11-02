@@ -36,6 +36,7 @@ runs on iOS 17 and later, on iPhone.
 | App UI | ⌘U in `Lowdrift.xcodeproj` (the Lowdrift scheme runs LowdriftUITests) | Fresh install opens on Basement AC, paused; six cards; selecting while paused stays paused; exactly three sliders; edits survive relaunch; Reset affects only that sound |
 | Eight-hour render | `cd LowdriftKit && LOWDRIFT_OVERNIGHT_TEST=1 swift test -c release --filter testOvernightRenderStaysClean` | Eight simulated hours rendered offline: no NaN, peak below the limiter ceiling, minute-to-minute level steady |
 | Privacy | `./scripts/privacy-audit.sh` | No network, tracking, recording, purchase or logging APIs in shipped code, no permission keys, empty privacy manifest |
+| Personal info | `./scripts/personal-info-check.sh` | The owner's personal information (stored only as hashes) is absent from files, commit messages, commit authors and branch names; commits use noreply emails; no home-directory paths |
 
 CI (`.github/workflows/ci.yml`) runs the package tests on Linux and macOS. It
 also builds the app for the iOS Simulator with the newest installed Xcode, checks

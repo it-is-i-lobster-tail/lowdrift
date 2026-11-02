@@ -11,6 +11,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  personal-info:
+    name: Personal info check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: No personal information in files or history
+        run: ./scripts/personal-info-check.sh
+
   package-linux:
     name: LowdriftKit tests (Linux)
     runs-on: ubuntu-latest
