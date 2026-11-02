@@ -1,0 +1,16 @@
+// The app's version, in one place for every target. Set as the base
+// configuration of the project, so the app and its test targets inherit it.
+// No target sets either value itself; scripts/release/check-version.sh enforces
+// that on every pull request.
+//
+// MARKETING_VERSION (CFBundleShortVersionString) is the release this branch is
+// heading for: MAJOR.MINOR.PATCH, digits and dots only. Change it only through
+// a reviewed pull request on main (scripts/release/bump-version.sh). The
+// release workflow opens that pull request after each App Store submission.
+//
+// CURRENT_PROJECT_VERSION (CFBundleVersion) is a placeholder for local builds.
+// Xcode Cloud stamps the real build number on every upload. Never commit a
+// real build number here. See docs/RELEASING.md.
+
+MARKETING_VERSION = 1.0.0
+CURRENT_PROJECT_VERSION = 1
