@@ -18,6 +18,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Check the PR's own commits, not the temporary merge commit GitHub
+          # makes for pull_request runs (it carries the account's email).
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: No personal information in files or history
         run: ./scripts/personal-info-check.sh
 
