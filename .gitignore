@@ -19,3 +19,9 @@ previews/
 
 # Written by ci_scripts/ci_post_clone.sh in Xcode Cloud
 TestFlight/
+
+# fastlane
+fastlane/report.xml
+fastlane/README.md
+fastlane/test_output/
+vendor/bundle/
