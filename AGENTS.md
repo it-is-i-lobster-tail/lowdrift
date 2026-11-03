@@ -69,6 +69,14 @@ interpolate every change.
 - Every control needs a VoiceOver label/value, works at the largest Dynamic Type
   sizes, has a large tap target and respects Reduce Motion.
 
+## Versions and releases
+
+- The version is set only in `Config/Version.xcconfig`; never add
+  `MARKETING_VERSION` or `CURRENT_PROJECT_VERSION` to a target. Keep
+  `CURRENT_PROJECT_VERSION = 1`: Xcode Cloud stamps real build numbers.
+- Only Xcode Cloud builds and uploads. Staging and prod promote the build of a
+  main commit and never rebuild. See `docs/RELEASING.md`.
+
 ## Honesty
 
 Report what was compiled and tested, and on what. Physical-device checks (the

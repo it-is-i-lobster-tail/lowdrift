@@ -1,0 +1,80 @@
+name: Promote to beta
+
+# A push to staging (merging main into it) sends the build Xcode Cloud already
+# made from that main commit to the external TestFlight group. Nothing is
+# rebuilt. See docs/RELEASING.md.
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+concurrency:
+  group: promote-beta
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push the vX.Y.Z-beta.N tag
+
+jobs:
+  promote:
+    name: Promote to beta
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find the main commit that was built
+        id: source
+        run: |
+          git fetch --quiet --tags origin main
+          commit=$(scripts/release/built-commit.sh "$GITHUB_SHA" origin/main)
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "Promoting main commit $commit"
+
+      - name: Tester notes
+        env:
+          COMMIT: ${{ steps.source.outputs.commit }}
+        run: |
+          previous=$(git describe --tags --abbrev=0 --match 'v*-beta.*' "$COMMIT^" 2>/dev/null || true)
+          range=${previous:+$previous..}$COMMIT
+          {
+            echo "Changes since ${previous:-the first build}:"
+            git log --no-merges --format='- %s' "$range" | head -40
+          } > "$RUNNER_TEMP/changelog.txt"
+          cat "$RUNNER_TEMP/changelog.txt"
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Add the build to the external TestFlight group
+        id: promote
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          BETA_GROUP: ${{ vars.BETA_GROUP || 'Beta' }}
+          CHANGELOG_PATH: ${{ runner.temp }}/changelog.txt
+          FASTLANE_SKIP_UPDATE_CHECK: "1"
+          FASTLANE_HIDE_CHANGELOG: "1"
+          FASTLANE_OPT_OUT_USAGE: "1"
+          LC_ALL: C.UTF-8
+        run: bundle exec fastlane promote_beta commit:${{ steps.source.outputs.commit }}
+
+      - name: Tag the main commit
+        env:
+          COMMIT: ${{ steps.source.outputs.commit }}
+          TAG: v${{ steps.promote.outputs.version }}-beta.${{ steps.promote.outputs.build_number }}
+        run: |
+          if existing=$(git rev-parse -q --verify "refs/tags/$TAG^{commit}"); then
+            [ "$existing" = "$COMMIT" ] || { echo "::error::$TAG already points at $existing"; exit 1; }
+            echo "$TAG already tagged"
+          else
+            git tag "$TAG" "$COMMIT"
+            git push origin "refs/tags/$TAG"
+          fi
+          echo "### Beta: $TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "Main commit \`$COMMIT\` is in TestFlight group \"${{ vars.BETA_GROUP || 'Beta' }}\"." >> "$GITHUB_STEP_SUMMARY"

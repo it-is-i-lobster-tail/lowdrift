@@ -1,0 +1,133 @@
+name: Promote to App Store
+
+# A push to prod (merging staging into it) submits the build testers already
+# have for App Store review, tags vX.Y.Z on the main commit it was built from,
+# creates the GitHub Release, and opens a pull request that moves main to the
+# next version. Nothing is rebuilt. See docs/RELEASING.md.
+on:
+  push:
+    branches: [prod]
+  workflow_dispatch:
+
+concurrency:
+  group: promote-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write      # tag and GitHub Release
+  pull-requests: write # version bump pull request (when no RELEASE_PR_TOKEN)
+
+jobs:
+  promote:
+    name: Promote to App Store
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.source.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find the main commit that was built
+        id: source
+        run: |
+          git fetch --quiet --tags origin main
+          commit=$(scripts/release/built-commit.sh "$GITHUB_SHA" origin/main)
+          version=$(git show "$commit:Config/Version.xcconfig" |
+            sed -nE 's/^[[:space:]]*MARKETING_VERSION[[:space:]]*=[[:space:]]*([0-9.]+).*/\1/p')
+          if existing=$(git rev-parse -q --verify "refs/tags/v$version^{commit}") && [ "$existing" != "$commit" ]; then
+            echo "::error::v$version was already released from $existing. Merge the version bump pull request on main, then promote a build of it."
+            exit 1
+          fi
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Promoting $version from main commit $commit"
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Submit the build for App Store review
+        id: promote
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          AUTOMATIC_RELEASE: ${{ vars.AUTOMATIC_RELEASE || 'true' }}
+          FASTLANE_SKIP_UPDATE_CHECK: "1"
+          FASTLANE_HIDE_CHANGELOG: "1"
+          FASTLANE_OPT_OUT_USAGE: "1"
+          LC_ALL: C.UTF-8
+        run: >-
+          bundle exec fastlane promote_release
+          commit:${{ steps.source.outputs.commit }}
+          version:${{ steps.source.outputs.version }}
+
+      - name: Tag and create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT: ${{ steps.source.outputs.commit }}
+          VERSION: ${{ steps.source.outputs.version }}
+          BUILD: ${{ steps.promote.outputs.build_number }}
+        run: |
+          tag="v$VERSION"
+          previous=$(git describe --tags --abbrev=0 --exclude '*-beta.*' --match 'v*' "$COMMIT^" 2>/dev/null || true)
+          {
+            echo "Lowdrift $VERSION (build $BUILD), submitted for App Store review."
+            echo
+            echo "Changes since ${previous:-the first commit}:"
+            git log --no-merges --format='- %s' "${previous:+$previous..}$COMMIT" | head -100
+          } > "$RUNNER_TEMP/notes.md"
+          if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            git tag "$tag" "$COMMIT"
+            git push origin "refs/tags/$tag"
+          fi
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --verify-tag --title "Lowdrift $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+          echo "### Released $tag (build $BUILD)" >> "$GITHUB_STEP_SUMMARY"
+
+  bump:
+    name: Open the next-version pull request
+    needs: promote
+    runs-on: ubuntu-latest
+    steps:
+      # A pull request opened with the workflow's own GITHUB_TOKEN does not
+      # start CI, so its required checks would never run. RELEASE_PR_TOKEN (a
+      # fine-grained token or GitHub App token with contents and pull request
+      # write access) avoids that; without it the PR still opens, and CI starts
+      # once someone pushes to it or closes and reopens it.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
+
+      - name: Bump main to the next version
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN || github.token }}
+          RELEASED: ${{ needs.promote.outputs.version }}
+          PART: ${{ vars.NEXT_VERSION_BUMP || 'minor' }}
+        run: |
+          current=$(scripts/release/bump-version.sh --print)
+          if [ "$current" != "$RELEASED" ]; then
+            echo "main is already at $current (released $RELEASED); nothing to bump."
+            exit 0
+          fi
+          next=$(scripts/release/bump-version.sh "$PART")
+          branch="release/next-after-$RELEASED"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "$branch already exists; leaving it as it is."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -am "Start $next after releasing $RELEASED"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "Start $next after releasing $RELEASED" \
+            --body "$RELEASED was submitted to the App Store, and Apple rejects new uploads of a version it has approved, so main moves to the next version.
+
+          This defaults to the next ${PART}. Before merging, edit \`Config/Version.xcconfig\` (or run \`scripts/release/bump-version.sh patch|minor|major\` on this branch) if the next release is a fixes-only patch or a major release. See docs/RELEASING.md."
