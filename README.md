@@ -43,6 +43,12 @@ also builds the app for the iOS Simulator with the newest installed Xcode, check
 the built app's Info.plist, App Intents metadata and linked frameworks, and runs
 the UI tests and the AVAudioEngine tests in the simulator (`scripts/ci-ios.sh`).
 
+Releases: Xcode Cloud builds every push to `main` for internal TestFlight
+testers; merging `main` into `staging` promotes that same build to external
+testers, and merging `staging` into `prod` submits it to the App Store. The
+version lives only in `Config/Version.xcconfig`. See
+[docs/RELEASING.md](docs/RELEASING.md).
+
 ### Listening without the app
 
 `lowdrift-render` writes WAV previews of the real engine:
@@ -93,6 +99,7 @@ Lowdrift/                 SwiftUI app: one screen, the Customize sheet, App Inte
   Intents/                Play, Pause, Play a sound; Siri phrases
   Resources/              Asset catalog (icon, colors, artwork), privacy manifest
 Config/Info.plist         Background audio, launch screen
+Config/Version.xcconfig   The app's version, for every target
 LowdriftKit/              Swift package with everything else
   LowdriftDSP             The procedural sound engine (real-time safe)
   LowdriftCore            Presets, on-device settings, playback state, palette
@@ -100,6 +107,10 @@ LowdriftKit/              Swift package with everything else
   LowdriftAnalysis        FFT and loudness measurement (tests and tools only)
   LowdriftRender          lowdrift-render command-line tool
 scripts/                  CI, privacy audit, icon generator
+scripts/release/          Version check, version bump, build lookup for promotion
+ci_scripts/               Xcode Cloud: TestFlight tester notes
+fastlane/                 Promotion lanes (find a build, beta, App Store); no building
+docs/RELEASING.md         Branches, channels, versions and how to release
 ```
 
 ### The sound engine

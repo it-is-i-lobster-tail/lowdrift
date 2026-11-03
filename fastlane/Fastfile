@@ -1,0 +1,267 @@
+# Promotion lanes for Lowdrift (see docs/RELEASING.md).
+#
+# Xcode Cloud is the only system that builds and uploads Lowdrift: every push
+# to main is archived, stamped with Xcode Cloud's build number and sent to the
+# internal TestFlight group. These lanes never build or upload. They find the
+# build Xcode Cloud made from a given main commit and move that same binary on:
+#
+#   find_build       commit:<sha>  -> prints the build's version and number
+#   promote_beta     commit:<sha>  -> adds it to the external TestFlight group
+#   promote_release  commit:<sha>  -> submits it for App Store review
+#
+# They read the App Store Connect API key from ASC_KEY_ID, ASC_ISSUER_ID and
+# ASC_KEY_P8_BASE64 (the .p8 file, base64-encoded; App Manager role).
+# Optional: BETA_GROUP (default "Beta"), FIND_BUILD_TIMEOUT_MINUTES (default 30),
+# AUTOMATIC_RELEASE ("true" by default; "false" holds an approved version for a
+# manual release), CHANGELOG_PATH (beta "What to Test" notes).
+
+require "json"
+require "net/http"
+require "uri"
+
+default_platform(:ios)
+
+APP_IDENTIFIER = "app.lowdrift.Lowdrift"
+ASC_API = ENV.fetch("ASC_API_URL", "https://api.appstoreconnect.apple.com") # override only for tests
+# App Store states of versions Apple has already approved.
+APPROVED_STATES = %w[
+  READY_FOR_SALE PENDING_DEVELOPER_RELEASE PENDING_APPLE_RELEASE PROCESSING_FOR_APP_STORE
+  REPLACED_WITH_NEW_VERSION REMOVED_FROM_SALE DEVELOPER_REMOVED_FROM_SALE
+].freeze
+
+platform :ios do
+  desc "Find the Xcode Cloud build of a main commit and wait until it is processed"
+  lane :find_build do |options|
+    build = find_built(options[:commit])
+    write_outputs(build)
+    build
+  end
+
+  desc "Add the build of a main commit to the external TestFlight group"
+  lane :promote_beta do |options|
+    build = find_built(options[:commit])
+    group = ENV.fetch("BETA_GROUP", "Beta")
+    changelog = read_changelog(build)
+    UI.message("Adding #{build[:version]} (#{build[:build_number]}) to TestFlight group \"#{group}\"")
+    upload_to_testflight(
+      api_key: asc_api_key,
+      app_identifier: APP_IDENTIFIER,
+      distribute_only: true,
+      app_version: build[:version],
+      build_number: build[:build_number],
+      groups: [group],
+      distribute_external: true,
+      notify_external_testers: true,
+      changelog: changelog
+    )
+    write_outputs(build)
+    build
+  end
+
+  desc "Submit the build of a main commit for App Store review"
+  lane :promote_release do |options|
+    build = find_built(options[:commit])
+    if options[:version] && options[:version] != build[:version]
+      UI.user_error!("The build of #{options[:commit]} is #{build[:version]}, but the commit's Version.xcconfig says #{options[:version]}")
+    end
+    check_above_approved(build[:version])
+    UI.message("Submitting #{build[:version]} (#{build[:build_number]}) for App Store review")
+    upload_to_app_store(
+      api_key: asc_api_key,
+      app_identifier: APP_IDENTIFIER,
+      app_version: build[:version],
+      build_number: build[:build_number],
+      skip_binary_upload: true,
+      skip_metadata: true,
+      skip_screenshots: true,
+      submit_for_review: true,
+      automatic_release: ENV.fetch("AUTOMATIC_RELEASE", "true") != "false",
+      force: true, # no HTML preview to confirm on CI
+      run_precheck_before_submit: false,
+      submission_information: {
+        add_id_info_uses_idfa: false,
+        export_compliance_uses_encryption: false
+      }
+    )
+    write_outputs(build)
+    build
+  end
+end
+
+# --- App Store Connect API -------------------------------------------------
+
+def asc_api_key
+  @asc_api_key ||= begin
+    %w[ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8_BASE64].each do |name|
+      UI.user_error!("#{name} is not set. Add it as a repository secret (see docs/RELEASING.md).") if ENV[name].to_s.empty?
+    end
+    app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_content: ENV["ASC_KEY_P8_BASE64"],
+      is_key_content_base64: true,
+      in_house: false
+    )
+  end
+end
+
+def asc_token
+  @asc_token ||= Spaceship::ConnectAPI::Token.create(**asc_api_key)
+  @asc_token.refresh! if @asc_token.expired?
+  @asc_token.text
+end
+
+# GET an App Store Connect API path; returns the parsed JSON body.
+def asc_get(path, params = {})
+  uri = URI.join(ASC_API, path)
+  uri.query = URI.encode_www_form(params) unless params.empty?
+  asc_get_uri(uri)
+end
+
+def asc_get_uri(uri)
+  attempts = 0
+  begin
+    attempts += 1
+    request = Net::HTTP::Get.new(uri)
+    request["Authorization"] = "Bearer #{asc_token}"
+    response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https", read_timeout: 60) { |http| http.request(request) }
+    if response.code.to_i == 429 || response.code.to_i >= 500
+      raise "App Store Connect returned #{response.code}"
+    end
+    unless response.is_a?(Net::HTTPSuccess)
+      UI.user_error!("App Store Connect GET #{uri.path} failed: #{response.code} #{response.body.to_s[0, 500]}")
+    end
+    JSON.parse(response.body)
+  rescue StandardError => e
+    raise if e.is_a?(FastlaneCore::Interface::FastlaneError) || attempts >= 4
+    sleep(2**attempts)
+    retry
+  end
+end
+
+# Every item of a paginated list, up to max_pages pages.
+def asc_get_all(path, params = {}, max_pages: 5)
+  body = asc_get(path, params)
+  items = body["data"]
+  (max_pages - 1).times do
+    next_url = body.dig("links", "next")
+    break unless next_url
+    body = asc_get_uri(URI(next_url))
+    items += body["data"]
+  end
+  items
+end
+
+def asc_app
+  @asc_app ||= begin
+    app = asc_get("/v1/apps", "filter[bundleId]" => APP_IDENTIFIER)["data"].first
+    UI.user_error!("No app with bundle ID #{APP_IDENTIFIER} in App Store Connect") unless app
+    app
+  end
+end
+
+# --- Finding a commit's build ------------------------------------------------
+
+# Waits for the Xcode Cloud build of `commit` to be uploaded and processed.
+# Returns { id:, version:, build_number:, commit: }.
+def find_built(commit)
+  UI.user_error!("Pass commit:<full sha of the main commit>") unless commit.to_s =~ /\A[0-9a-f]{40}\z/
+  timeout = ENV.fetch("FIND_BUILD_TIMEOUT_MINUTES", "30").to_i * 60
+  deadline = Time.now + timeout
+  product = asc_get("/v1/apps/#{asc_app['id']}/ciProduct")["data"]
+  UI.user_error!("Xcode Cloud is not set up for #{APP_IDENTIFIER}") unless product
+
+  loop do
+    state = build_state(product["id"], commit)
+    return state[:build] if state[:build]
+    UI.user_error!(state[:error]) if state[:error]
+    if Time.now > deadline
+      UI.user_error!("Gave up after #{timeout / 60} minutes: #{state[:waiting]}")
+    end
+    UI.message("Waiting: #{state[:waiting]}")
+    sleep(60)
+  end
+end
+
+# One look at the commit's Xcode Cloud runs. Returns { build: } when a
+# processed build exists, { error: } when it never will, or { waiting: }.
+def build_state(product_id, commit)
+  runs = asc_get_all("/v1/ciProducts/#{product_id}/buildRuns", { "limit" => 200 }, max_pages: 10)
+  runs = runs.select do |run|
+    attributes = run["attributes"] || {}
+    attributes.dig("sourceCommit", "commitSha") == commit && !attributes["isPullRequestBuild"]
+  end
+  runs.sort_by! { |run| -run.dig("attributes", "number").to_i }
+  if runs.empty?
+    return { waiting: "no Xcode Cloud build run for #{commit[0, 7]} yet. Was it pushed to main, and did the Alpha workflow start?" }
+  end
+
+  waiting = []
+  failures = []
+  runs.each do |run|
+    number = run.dig("attributes", "number")
+    progress = run.dig("attributes", "executionProgress")
+    status = run.dig("attributes", "completionStatus")
+    builds = asc_get("/v1/ciBuildRuns/#{run['id']}/builds")["data"]
+    builds.each do |build|
+      attributes = build["attributes"]
+      label = "build #{attributes['version']} of #{commit[0, 7]} (Xcode Cloud run #{number})"
+      case attributes["processingState"]
+      when "VALID"
+        if attributes["expired"]
+          failures << "#{label} has expired in TestFlight (builds last 90 days). Push a new commit to main and promote that."
+          next
+        end
+        version = asc_get("/v1/builds/#{build['id']}/preReleaseVersion").dig("data", "attributes", "version")
+        UI.success("#{commit[0, 7]} is #{version} (#{attributes['version']}), from Xcode Cloud run #{number}")
+        return { build: { id: build["id"], version: version, build_number: attributes["version"], commit: commit } }
+      when "FAILED", "INVALID"
+        failures << "#{label} is #{attributes['processingState']} in App Store Connect."
+      else
+        waiting << "#{label} is #{attributes['processingState']} in App Store Connect"
+      end
+    end
+    next unless builds.empty?
+
+    if progress != "COMPLETE"
+      waiting << "Xcode Cloud run #{number} for #{commit[0, 7]} is #{progress}"
+    elsif status == "SUCCEEDED"
+      waiting << "Xcode Cloud run #{number} for #{commit[0, 7]} succeeded; its build is not listed yet"
+    else
+      failures << "Xcode Cloud run #{number} for #{commit[0, 7]} ended #{status} without a build. Fix main and promote a newer commit."
+    end
+  end
+  return { waiting: waiting.first } unless waiting.empty?
+
+  { error: failures.join(" ") }
+end
+
+# Fails unless `version` is above every version Apple has approved.
+def check_above_approved(version)
+  versions = asc_get_all("/v1/apps/#{asc_app['id']}/appStoreVersions",
+                         { "filter[platform]" => "IOS", "limit" => 200 }, max_pages: 2)
+  approved = versions.select { |v| APPROVED_STATES.include?(v.dig("attributes", "appStoreState")) }
+                     .map { |v| v.dig("attributes", "versionString") }
+  highest = approved.max_by { |v| Gem::Version.new(v) }
+  if highest && Gem::Version.new(version) <= Gem::Version.new(highest)
+    UI.user_error!("#{version} is not above #{highest}, which Apple already approved. Merge the version bump on main, let Xcode Cloud build it, and promote that.")
+  end
+  UI.message(highest ? "#{version} is above the approved #{highest}" : "No approved version yet; #{version} will be the first")
+end
+
+def read_changelog(build)
+  path = ENV["CHANGELOG_PATH"].to_s
+  text = File.exist?(path) ? File.read(path).strip : ""
+  text = "Lowdrift #{build[:version]} (#{build[:build_number]})" if text.empty?
+  text[0, 3900]
+end
+
+# Lets the GitHub workflow read what was promoted.
+def write_outputs(build)
+  path = ENV["GITHUB_OUTPUT"]
+  return if path.to_s.empty?
+  File.open(path, "a") do |file|
+    file.puts("version=#{build[:version]}")
+    file.puts("build_number=#{build[:build_number]}")
+  end
+end

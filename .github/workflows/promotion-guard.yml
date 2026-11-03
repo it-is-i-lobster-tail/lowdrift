@@ -1,0 +1,32 @@
+name: Promotion guard
+
+# Staging and prod only take promotions: main -> staging, staging -> prod.
+# Make "Promotion source" a required check on both branches (see
+# .github/rulesets/) so nothing else can be merged into them.
+on:
+  pull_request:
+    branches: [staging, prod]
+
+permissions: {}
+
+jobs:
+  source:
+    name: Promotion source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the pull request's source branch
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD: ${{ github.head_ref }}
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          case "$BASE" in
+            staging) expected=main ;;
+            prod) expected=staging ;;
+            *) echo "Not a promotion branch: $BASE"; exit 0 ;;
+          esac
+          if [ "$SAME_REPO" != true ] || [ "$HEAD" != "$expected" ]; then
+            echo "::error::Pull requests into $BASE must come from $expected in this repository, not ${HEAD}. Land changes on main first (see docs/RELEASING.md)."
+            exit 1
+          fi
+          echo "$HEAD -> $BASE is a promotion. Merge it with a merge commit (not squash or rebase)."

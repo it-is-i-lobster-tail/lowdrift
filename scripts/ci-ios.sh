@@ -44,6 +44,19 @@ tail -n 5 build/xcodebuild-build.log
 # Shortcuts and Siri see the intents), nothing network/tracking-related linked.
 app=$(find "$derived/Build/Products" -maxdepth 2 -name Lowdrift.app -type d | head -1)
 echo "UIBackgroundModes: $(plutil -extract UIBackgroundModes json -o - "$app/Info.plist")"
+# The app and its UI test bundle carry the version from Config/Version.xcconfig
+# and the placeholder build number (Xcode Cloud stamps the real one).
+expected=$(scripts/release/bump-version.sh --print)
+uitests=$(find "$derived/Build/Products" -name LowdriftUITests.xctest -type d | head -1)
+for bundle in "$app" "$uitests"; do
+    shown=$(plutil -extract CFBundleShortVersionString raw -o - "$bundle/Info.plist")
+    build=$(plutil -extract CFBundleVersion raw -o - "$bundle/Info.plist")
+    echo "$(basename "$bundle"): $shown ($build)"
+    if [ "$shown" != "$expected" ] || [ "$build" != 1 ]; then
+        echo "$(basename "$bundle") is $shown ($build); Version.xcconfig says $expected (1)" >&2
+        exit 1
+    fi
+done
 if [ ! -d "$app/Metadata.appintents" ]; then
     echo "App Intents metadata missing from the app bundle" >&2
     exit 1
