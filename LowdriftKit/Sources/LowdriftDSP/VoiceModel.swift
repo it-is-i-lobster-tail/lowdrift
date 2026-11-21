@@ -309,6 +309,8 @@ enum VoiceModel {
     static var glideSeconds: Float { 0.28 }
     static var rumbleK: Float { 1.414_213_6 }
     static var rumbleHighpassHz: Float { 24 }
+    /// Blade texture rate for sounds that have none of their own (roughness range).
+    static var fallbackBladeHz: Float { 26 }
 
     /// Derives voice targets. Real-time safe: scalar math over a preallocated grid.
     static func derive(
@@ -316,6 +318,8 @@ enum VoiceModel {
         depth: Float,
         airflow: Float,
         hum: Float,
+        flutter: Float = 0.5,
+        drift: Float = 0.5,
         compactSpeaker: Bool = false,
         grid: ResponseGrid,
         prediction: UnsafeMutablePointer<SoundPrediction>? = nil
@@ -324,6 +328,8 @@ enum VoiceModel {
         let d = min(max(depth, 0), 1) - 0.5
         let a = min(max(airflow, 0), 1) - 0.5
         let humAmount = min(max(hum, 0), 1)
+        let f = min(max(flutter, 0), 1) - 0.5
+        let driftAmount = min(max(drift, 0), 1)
         let nyquistLimit = log2(fs * 0.45)
 
         var t = VoiceTargets()
@@ -343,10 +349,18 @@ enum VoiceModel {
         t.presenceGain = min(c.presenceBoost * decibelsToGain(c.airflowPresenceDb * a - c.depthPresenceDb * d),
                              0.6 + 2.4 * t.presenceOpen)
         t.rumble = log2(c.rumbleHz) - 0.35 * d
-        t.blade = log2(max(c.bladeHz, 1))
-        t.bladeDepth = c.bladeHz > 0 ? min(max(c.bladeDepth * (1 + 1.2 * a), 0), 0.09) : 0
-        t.turbulence = min(max(c.turbulence * (1 + 1.6 * a), 0), 0.35)
-        t.drift = min(max(c.drift, 0), 1)
+        // Flutter: blade texture and air turbulence around the character's own amount.
+        // Sounds without a blade rate get a soft one above the middle of the range,
+        // so Choppy always means something; Smooth fades the blade out entirely.
+        let hasBlade = c.bladeHz > 0
+        t.blade = log2(hasBlade ? c.bladeHz : VoiceModel.fallbackBladeHz)
+        let ownBlade = hasBlade ? c.bladeDepth * exp2(3 * f) : 0
+        let addedBlade = 0.11 * max(f, 0)
+        let bladeAmount = (ownBlade + addedBlade) * (1 + 1.2 * a) * min(2 * f + 1, 1)
+        t.bladeDepth = min(max(bladeAmount, 0), 0.09)
+        t.turbulence = min(max(c.turbulence * (1 + 1.6 * a) * exp2(2 * f), 0), 0.35)
+        // Drift: slow natural wander, from rock steady (0) to twice the character's own.
+        t.drift = min(max(c.drift, 0), 1) * 2 * driftAmount
         t.humFundamental = log2(c.humHz)
         t.humNoise = log2(c.humHz * c.humNoiseRatio)
         t.humNoiseQ = c.humNoiseQ

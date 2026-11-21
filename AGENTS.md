@@ -33,7 +33,10 @@ It is not a DAW. Read the README for the layout and how to test.
   buffers or loops.
 - Depth = spectral warmth/body, Airflow = rush/turbulence texture, Hum = quiet
   motor harmonics.
-  - None of the three is a volume control, and they stay independent.
+  - Flutter = blade texture (Smooth ↔ Choppy), Drift = slow natural variation
+    (Steady ↔ Wandering). Both sit at 50 by default, meaning the sound's own
+    amount.
+  - None of the five is a volume control, and they stay independent.
   - Extreme settings stay pleasant: no hiss, whine, pumping or sudden shifts.
 - Basement AC is the signature sound: a soft, deep “whoooosh” with a little
   distant mechanical hum.

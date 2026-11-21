@@ -145,6 +145,9 @@ final class PlaybackControllerTests: XCTestCase {
             controller.setHum(100)
             controller.select(.deepDrift)
             controller.setDepth(0)
+            controller.setFlutter(100)
+            controller.setDrift(0)
+            XCTAssertTrue(controller.isCustomized)
             controller.resetToDefault()
             XCTAssertEqual(controller.controls, Preset.deepDrift.defaultControls)
             XCTAssertEqual(output.sound?.controls, Preset.deepDrift.defaultControls, "Reset is audible at once")
@@ -293,7 +296,9 @@ final class SliderAccessorTests: XCTestCase {
             controller.depth = 22
             controller.airflow = 44
             controller.hum = 66
-            XCTAssertEqual(controller.controls, SoundControls(depth: 22, airflow: 44, hum: 66))
+            controller.flutter = 12
+            controller.drift = 88
+            XCTAssertEqual(controller.controls, SoundControls(depth: 22, airflow: 44, hum: 66, flutter: 12, drift: 88))
             XCTAssertEqual(output.sound?.controls, controller.controls)
             XCTAssertEqual(SettingsStore(storage: storage).controls(for: .basementAC), controller.controls)
             controller.hum = .nan

@@ -108,6 +108,8 @@ public final class PlaybackController {
     public func setDepth(_ value: Double) { updateControls { $0.depth = value } }
     public func setAirflow(_ value: Double) { updateControls { $0.airflow = value } }
     public func setHum(_ value: Double) { updateControls { $0.hum = value } }
+    public func setFlutter(_ value: Double) { updateControls { $0.flutter = value } }
+    public func setDrift(_ value: Double) { updateControls { $0.drift = value } }
 
     // Two-way accessors for sliders (0–100); setting applies and saves the value.
     public var depth: Double {
@@ -123,6 +125,16 @@ public final class PlaybackController {
     public var hum: Double {
         get { controls.hum }
         set { setHum(newValue) }
+    }
+
+    public var flutter: Double {
+        get { controls.flutter }
+        set { setFlutter(newValue) }
+    }
+
+    public var drift: Double {
+        get { controls.drift }
+        set { setDrift(newValue) }
     }
 
     /// Restores the selected preset's shipping values (only that preset).

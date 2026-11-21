@@ -55,7 +55,9 @@ final class LowdriftUITests: XCTestCase {
         XCTAssertTrue(depth.waitForExistence(timeout: 5))
         XCTAssertTrue(app.sliders["Airflow"].exists)
         XCTAssertTrue(app.sliders["Hum"].exists)
-        XCTAssertEqual(app.sliders.count, 3, "Exactly three controls")
+        XCTAssertTrue(app.sliders["Flutter"].exists)
+        XCTAssertTrue(app.sliders["Drift"].exists)
+        XCTAssertEqual(app.sliders.count, 5, "Exactly five controls")
         XCTAssertFalse(app.buttons["reset"].isEnabled, "Nothing to reset yet")
 
         let original = depth.value as? String

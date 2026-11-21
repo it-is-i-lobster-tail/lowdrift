@@ -12,7 +12,8 @@ final class RenderingOutput: AudioOutput {
 
     func setSound(_ preset: Preset, controls: SoundControls) {
         renderer.setSound(preset.soundProfile, depth: controls.depth / 100,
-                          airflow: controls.airflow / 100, hum: controls.hum / 100)
+                          airflow: controls.airflow / 100, hum: controls.hum / 100,
+                          flutter: controls.flutter / 100, drift: controls.drift / 100)
     }
 
     func start() throws {

@@ -70,7 +70,7 @@ public enum Preset: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Shipping values of the three controls (0–100).
+    /// Shipping values of Depth, Airflow and Hum (0–100); Flutter and Drift start at 50.
     public var defaultControls: SoundControls {
         switch self {
         case .softFan: return SoundControls(depth: 35, airflow: 35, hum: 10)
@@ -105,23 +105,35 @@ public enum Preset: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// The three user-facing controls, each 0–100.
+/// The five user-facing controls, each 0–100.
+///
+/// Flutter and Drift sit at 50 for every sound by default, which means "this
+/// sound's own amount"; the sound's identity lives in its character, not here.
 public struct SoundControls: Equatable, Sendable {
     public static let range: ClosedRange<Double> = 0 ... 100
+    /// Default position of Flutter and Drift.
+    public static let neutral: Double = 50
 
     public var depth: Double { didSet { depth = Self.clamped(depth, fallback: oldValue) } }
     public var airflow: Double { didSet { airflow = Self.clamped(airflow, fallback: oldValue) } }
     public var hum: Double { didSet { hum = Self.clamped(hum, fallback: oldValue) } }
+    /// Blade texture: Smooth ↔ Choppy.
+    public var flutter: Double { didSet { flutter = Self.clamped(flutter, fallback: oldValue) } }
+    /// Slow natural variation: Steady ↔ Wandering.
+    public var drift: Double { didSet { drift = Self.clamped(drift, fallback: oldValue) } }
 
-    public init(depth: Double, airflow: Double, hum: Double) {
+    public init(depth: Double, airflow: Double, hum: Double, flutter: Double = neutral, drift: Double = neutral) {
         self.depth = Self.clamped(depth, fallback: 50)
         self.airflow = Self.clamped(airflow, fallback: 50)
         self.hum = Self.clamped(hum, fallback: 0)
+        self.flutter = Self.clamped(flutter, fallback: Self.neutral)
+        self.drift = Self.clamped(drift, fallback: Self.neutral)
     }
 
     /// True when every control is within half a step of `other`.
     public func isApproximatelyEqual(to other: SoundControls) -> Bool {
         abs(depth - other.depth) < 0.5 && abs(airflow - other.airflow) < 0.5 && abs(hum - other.hum) < 0.5
+            && abs(flutter - other.flutter) < 0.5 && abs(drift - other.drift) < 0.5
     }
 
     static func clamped(_ value: Double, fallback: Double) -> Double {

@@ -31,7 +31,9 @@ public final class AudioEngineOutput: AudioOutput {
             preset.soundProfile,
             depth: controls.depth / 100,
             airflow: controls.airflow / 100,
-            hum: controls.hum / 100
+            hum: controls.hum / 100,
+            flutter: controls.flutter / 100,
+            drift: controls.drift / 100
         )
     }
 

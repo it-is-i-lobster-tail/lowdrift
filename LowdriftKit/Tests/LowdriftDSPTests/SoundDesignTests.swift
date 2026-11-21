@@ -129,3 +129,103 @@ final class SoundDesignTests: XCTestCase {
         XCTAssertLessThan(centroid(.windowAC), centroid(.deskFan))
     }
 }
+
+/// Flutter and Drift: texture over time, never level or tone.
+final class TextureControlTests: XCTestCase {
+    /// Power of the envelope's spectral line at the blade rate, from 2 ms blocks.
+    private func bladeLine(_ samples: [Float], hz: Double) -> Double {
+        let block = 96
+        let envelope = stride(from: 0, to: samples.count - block, by: block).map { start -> Double in
+            Signal.rms(samples[start ..< start + block])
+        }
+        let mean = envelope.reduce(0, +) / Double(envelope.count)
+        let spectrum = PowerSpectrum(envelope.map { Float($0 / mean - 1) }, sampleRate: 500, segment: 8_192)
+        return spectrum.power(from: hz * 0.995, to: hz * 1.005)
+    }
+
+    /// Spread of the level measured over consecutive 2-second windows, in dB.
+    private func slowLevelSpread(_ samples: [Float]) -> Double {
+        let window = 96_000
+        let levels = stride(from: 0, to: samples.count - window + 1, by: window / 2).map {
+            decibels(Signal.rms(samples[$0 ..< $0 + window]))
+        }
+        return levels.max()! - levels.min()!
+    }
+
+    func testFlutterAndDriftAtNeutralLeaveTheSoundUnchanged() {
+        for preset in Preset.allCases {
+            let c = preset.defaultControls
+            XCTAssertEqual(c.flutter, SoundControls.neutral)
+            XCTAssertEqual(c.drift, SoundControls.neutral)
+            let a = NoiseRenderer.predict(preset.soundProfile, depth: c.depth / 100, airflow: c.airflow / 100, hum: c.hum / 100)
+            let b = NoiseRenderer.predict(preset.soundProfile, depth: c.depth / 100, airflow: c.airflow / 100,
+                                          hum: c.hum / 100, flutter: 0.5, drift: 0.5)
+            XCTAssertEqual(a.weightedRMS, b.weightedRMS)
+            XCTAssertEqual(a.bladeDepth, b.bladeDepth)
+            XCTAssertEqual(a.turbulence, b.turbulence)
+        }
+    }
+
+    func testFlutterGoesFromSmoothToChoppy() {
+        for preset in Preset.allCases {
+            let c = preset.defaultControls
+            let smooth = NoiseRenderer.predict(preset.soundProfile, depth: c.depth / 100, airflow: c.airflow / 100,
+                                               hum: c.hum / 100, flutter: 0)
+            let choppy = NoiseRenderer.predict(preset.soundProfile, depth: c.depth / 100, airflow: c.airflow / 100,
+                                               hum: c.hum / 100, flutter: 1)
+            XCTAssertEqual(smooth.bladeDepth, 0, "\(preset) Smooth still has blade texture")
+            XCTAssertGreaterThan(choppy.bladeDepth, 0.03, "\(preset) Choppy is too subtle")
+            XCTAssertLessThanOrEqual(choppy.bladeDepth, 0.09, "\(preset) Choppy pumps")
+            XCTAssertGreaterThan(choppy.turbulence, smooth.turbulence * 3, "\(preset)")
+        }
+        // Sounds without their own blade rate use a 26 Hz one when Choppy. Drift is
+        // held at Steady so the blade rate stays exact for the narrow measurement, and
+        // Hum is off because motor partials also beat at the blade rate.
+        for preset in [Preset.boxFan, .ceilingFan, .bedroomFan] {
+            let character = preset.soundProfile.character
+            let hz = Double(character.bladeHz > 0 ? character.bladeHz : 26)
+            let smooth = bladeLine(renderPreset(preset, hum: 0, flutter: 0, drift: 0, seconds: 20), hz: hz)
+            let choppy = bladeLine(renderPreset(preset, hum: 0, flutter: 100, drift: 0, seconds: 20), hz: hz)
+            XCTAssertGreaterThan(10 * log10(choppy / smooth), 6, "\(preset) Flutter is not audible in the envelope")
+        }
+    }
+
+    func testDriftGoesFromSteadyToWandering() {
+        for preset in Preset.allCases {
+            let c = preset.defaultControls
+            let steady = NoiseRenderer.predict(preset.soundProfile, depth: c.depth / 100, airflow: c.airflow / 100,
+                                               hum: c.hum / 100, drift: 0)
+            XCTAssertEqual(steady.weightedRMS, NoiseRenderer.predict(preset.soundProfile, depth: c.depth / 100,
+                                                                     airflow: c.airflow / 100, hum: c.hum / 100,
+                                                                     drift: 1).weightedRMS)
+        }
+        let steady = slowLevelSpread(renderPreset(.basementAC, drift: 0, seconds: 60))
+        let wandering = slowLevelSpread(renderPreset(.basementAC, drift: 100, seconds: 60))
+        XCTAssertGreaterThan(wandering, steady, "Drift does not add slow variation")
+        XCTAssertLessThan(wandering, 2.5, "Wandering is pumping (\(wandering) dB)")
+    }
+
+    func testFlutterAndDriftAreNotVolumeOrToneControls() {
+        for preset in Preset.allCases {
+            var levels: [Double] = []
+            var centroids: [Double] = []
+            for (flutter, drift) in [(0.0, 0.0), (100.0, 100.0), (0.0, 100.0), (100.0, 0.0)] {
+                let spectrum = PowerSpectrum(renderPreset(preset, flutter: flutter, drift: drift, seconds: 3), sampleRate: 48_000)
+                levels.append(decibels(spectrum.weightedRMS))
+                centroids.append(spectrum.centroid)
+            }
+            XCTAssertLessThan(levels.max()! - levels.min()!, 1.5, "\(preset): \(levels)")
+            XCTAssertLessThan(centroids.max()! / centroids.min()!, 1.15, "\(preset) changes tone: \(centroids)")
+        }
+    }
+
+    func testExtremeTextureStaysBounded() {
+        for preset in Preset.allCases {
+            for (depth, airflow) in [(0.0, 100.0), (100.0, 100.0)] {
+                let samples = renderPreset(preset, depth: depth, airflow: airflow, hum: 100, flutter: 100, drift: 100, seconds: 2)
+                XCTAssertTrue(samples.allSatisfy(\.isFinite))
+                XCTAssertLessThan(Signal.peak(samples), 0.97, "\(preset) d\(depth) a\(airflow)")
+            }
+        }
+    }
+}

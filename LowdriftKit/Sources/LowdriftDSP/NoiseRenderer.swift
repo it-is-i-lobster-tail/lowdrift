@@ -31,6 +31,8 @@ public final class NoiseRenderer: @unchecked Sendable {
         control.storeFloat(0.5, .depth)
         control.storeFloat(0.5, .airflow)
         control.storeFloat(0, .hum)
+        control.storeFloat(0.5, .flutter)
+        control.storeFloat(0.5, .drift)
         control.store(UInt32(SoundProfile.basementAC.rawValue), .profile)
         control.storeFloat(Self.defaultFadeIn, .fadeInSeconds)
         control.storeFloat(Self.defaultFadeOut, .fadeOutSeconds)
@@ -47,13 +49,17 @@ public final class NoiseRenderer: @unchecked Sendable {
 
     // MARK: - Control (any non-real-time thread)
 
-    /// Sets the sound to generate. Controls are 0…1. If audible, the change glides
-    /// (same profile) or crossfades (new profile); if silent it applies instantly.
-    public func setSound(_ profile: SoundProfile, depth: Double, airflow: Double, hum: Double) {
+    /// Sets the sound to generate. Controls are 0…1; Flutter and Drift sit at 0.5
+    /// for the sound's own character. If audible, the change glides (same profile)
+    /// or crossfades (new profile); if silent it applies instantly.
+    public func setSound(_ profile: SoundProfile, depth: Double, airflow: Double, hum: Double,
+                         flutter: Double = 0.5, drift: Double = 0.5) {
         control.store(UInt32(profile.rawValue), .profile)
         control.storeFloat(Float(depth), .depth)
         control.storeFloat(Float(airflow), .airflow)
         control.storeFloat(Float(hum), .hum)
+        control.storeFloat(Float(flutter), .flutter)
+        control.storeFloat(Float(drift), .drift)
         control.bumpVersion()
     }
 
@@ -113,6 +119,8 @@ public final class NoiseRenderer: @unchecked Sendable {
         depth: Double,
         airflow: Double,
         hum: Double,
+        flutter: Double = 0.5,
+        drift: Double = 0.5,
         compactSpeaker: Bool = false,
         sampleRate: Double = 48_000
     ) -> SoundPrediction {
@@ -120,7 +128,8 @@ public final class NoiseRenderer: @unchecked Sendable {
         var prediction = SoundPrediction(rms: 0, weightedRMS: 0, humAmplitudes: .zero, humFundamentalHz: 0)
         _ = withUnsafeMutablePointer(to: &prediction) { pointer in
             VoiceModel.derive(character ?? profile.character, depth: Float(depth), airflow: Float(airflow),
-                              hum: Float(hum), compactSpeaker: compactSpeaker, grid: grid, prediction: pointer)
+                              hum: Float(hum), flutter: Float(flutter), drift: Float(drift),
+                              compactSpeaker: compactSpeaker, grid: grid, prediction: pointer)
         }
         return prediction
     }
@@ -141,6 +150,8 @@ final class ControlWords {
         case depth
         case airflow
         case hum
+        case flutter
+        case drift
         case compactSpeaker
         case sampleRate
         case playing
@@ -219,6 +230,8 @@ struct RenderCore {
     private var requestedDepth: Float = 0.5
     private var requestedAirflow: Float = 0.5
     private var requestedHum: Float = 0
+    private var requestedFlutter: Float = 0.5
+    private var requestedDrift: Float = 0.5
     private var compactSpeaker = false
 
     private static var blockSize: Int { 64 }
@@ -312,6 +325,8 @@ struct RenderCore {
         requestedDepth = sanitizedControl(control.loadFloat(.depth), fallback: requestedDepth)
         requestedAirflow = sanitizedControl(control.loadFloat(.airflow), fallback: requestedAirflow)
         requestedHum = sanitizedControl(control.loadFloat(.hum), fallback: requestedHum)
+        requestedFlutter = sanitizedControl(control.loadFloat(.flutter), fallback: requestedFlutter)
+        requestedDrift = sanitizedControl(control.loadFloat(.drift), fallback: requestedDrift)
 
         playing = control.load(.playing) != 0
         fadeInSeconds = sanitizedDuration(control.loadFloat(.fadeInSeconds), fallback: NoiseRenderer.defaultFadeIn)
@@ -325,6 +340,7 @@ struct RenderCore {
     private mutating func applyRequestedSound() {
         let targets = VoiceModel.derive(characters.pointer[requestedProfile], depth: requestedDepth,
                                         airflow: requestedAirflow, hum: requestedHum,
+                                        flutter: requestedFlutter, drift: requestedDrift,
                                         compactSpeaker: compactSpeaker, grid: grid)
         let silent = masterPosition <= 0 && masterGain.value == 0
 
@@ -435,6 +451,7 @@ struct RenderCore {
         outputHighpass.reset()
         let targets = VoiceModel.derive(characters.pointer[requestedProfile], depth: requestedDepth,
                                         airflow: requestedAirflow, hum: requestedHum,
+                                        flutter: requestedFlutter, drift: requestedDrift,
                                         compactSpeaker: compactSpeaker, grid: grid)
         crossfading = false
         activeIsA = true

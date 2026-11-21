@@ -77,6 +77,25 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.controls(for: .basementAC), SoundControls(depth: 100, airflow: 0, hum: 50))
     }
 
+    func testFlutterAndDriftPersistAndOlderSavesKeepTheirSound() {
+        let storage = InMemoryStorage()
+        let store = SettingsStore(storage: storage)
+        store.setControls(SoundControls(depth: 40, airflow: 60, hum: 10, flutter: 5, drift: 95), for: .bedroomFan)
+        XCTAssertEqual(SettingsStore(storage: storage).controls(for: .bedroomFan),
+                       SoundControls(depth: 40, airflow: 60, hum: 10, flutter: 5, drift: 95))
+
+        // Saved by a build with only three controls: the new two start at their neutral 50.
+        storage.values[SettingsStore.Key.controls(.boxFan)] = ["depth": 10.0, "airflow": 20.0, "hum": 30.0]
+        let older = store.controls(for: .boxFan)
+        XCTAssertEqual(older, SoundControls(depth: 10, airflow: 20, hum: 30))
+        XCTAssertEqual(older.flutter, SoundControls.neutral)
+        XCTAssertEqual(older.drift, SoundControls.neutral)
+
+        storage.values[SettingsStore.Key.controls(.boxFan)] = ["depth": 10.0, "airflow": 20.0, "hum": 30.0,
+                                                               "flutter": Double.nan, "drift": 300.0]
+        XCTAssertEqual(store.controls(for: .boxFan), SoundControls(depth: 10, airflow: 20, hum: 30))
+    }
+
     func testPersistsThroughUserDefaults() throws {
         let suite = "lowdrift.tests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -93,8 +112,10 @@ final class SettingsStoreTests: XCTestCase {
     }
 
     func testSoundControlsClampAndRejectInvalidValues() {
-        var controls = SoundControls(depth: .nan, airflow: 140, hum: -3)
-        XCTAssertEqual(controls, SoundControls(depth: 50, airflow: 100, hum: 0))
+        var controls = SoundControls(depth: .nan, airflow: 140, hum: -3, flutter: .infinity, drift: -1)
+        XCTAssertEqual(controls, SoundControls(depth: 50, airflow: 100, hum: 0, flutter: 50, drift: 0))
+        controls.flutter = 200
+        XCTAssertEqual(controls.flutter, 100)
         controls.depth = 30
         controls.depth = .infinity
         XCTAssertEqual(controls.depth, 30, "A non-finite edit keeps the previous value")

@@ -2,13 +2,13 @@ import LowdriftCore
 import SwiftUI
 import UIKit
 
-/// Native sheet with the three sound controls for the selected preset. Changes
+/// Native sheet with the five sound controls for the selected preset. Changes
 /// are heard immediately and saved automatically; there is no Save button.
 struct CustomizeSheet: View {
     @Bindable var controller: PlaybackController
 
     @Environment(\.dismiss) private var dismiss
-    @ScaledMetric(relativeTo: .body) private var compactHeight: CGFloat = 480
+    @ScaledMetric(relativeTo: .body) private var compactHeight: CGFloat = 640
 
     var body: some View {
         NavigationStack {
@@ -26,6 +26,14 @@ struct CustomizeSheet: View {
                         title: "Hum", low: "None", high: "More",
                         value: $controller.hum
                     )
+                    SoundSlider(
+                        title: "Flutter", low: "Smooth", high: "Choppy",
+                        value: $controller.flutter
+                    )
+                    SoundSlider(
+                        title: "Drift", low: "Steady", high: "Wandering",
+                        value: $controller.drift
+                    )
 
                     Button {
                         controller.resetToDefault()
@@ -39,7 +47,7 @@ struct CustomizeSheet: View {
                     .controlSize(.large)
                     .tint(Theme.accent)
                     .disabled(!controller.isCustomized)
-                    .accessibilityHint("Restores Depth, Airflow and Hum for \(controller.selectedPreset.name) only.")
+                    .accessibilityHint("Restores all five controls for \(controller.selectedPreset.name) only.")
                     .accessibilityIdentifier("reset")
                     .padding(.top, 4)
                 }

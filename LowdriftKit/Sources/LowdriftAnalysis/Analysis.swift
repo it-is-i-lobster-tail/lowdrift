@@ -10,6 +10,8 @@ public func renderSound(
     depth: Double,
     airflow: Double,
     hum: Double,
+    flutter: Double = 0.5,
+    drift: Double = 0.5,
     seconds: Double,
     sampleRate: Double = 48_000,
     seed: UInt64 = 0x10D2_1F7,
@@ -23,7 +25,7 @@ public func renderSound(
         seed: seed
     )
     renderer.setCompactSpeaker(compactSpeaker)
-    renderer.setSound(profile, depth: depth, airflow: airflow, hum: hum)
+    renderer.setSound(profile, depth: depth, airflow: airflow, hum: hum, flutter: flutter, drift: drift)
     renderer.fadeIn()
     var discard = [Float](repeating: 0, count: 1_024)
     var remaining = Int(settleSeconds * sampleRate)

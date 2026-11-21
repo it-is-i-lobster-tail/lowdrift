@@ -17,6 +17,8 @@ struct Options {
     var depth: Double?
     var airflow: Double?
     var hum: Double?
+    var flutter: Double?
+    var drift: Double?
     var output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("previews")
     var writeFiles = true
     /// Renders every preset at the corners and centre of the Depth × Airflow range.
@@ -35,6 +37,8 @@ func parse(_ arguments: [String]) -> Options {
         case "--depth": options.depth = Double(iterator.next() ?? "")
         case "--airflow": options.airflow = Double(iterator.next() ?? "")
         case "--hum": options.hum = Double(iterator.next() ?? "")
+        case "--flutter": options.flutter = Double(iterator.next() ?? "")
+        case "--drift": options.drift = Double(iterator.next() ?? "")
         case "--out": options.output = URL(fileURLWithPath: (iterator.next() ?? "previews") as NSString as String)
         case "--no-files": options.writeFiles = false
         case "--matrix": options.matrix = true
@@ -97,8 +101,10 @@ for preset in options.presets {
     let depth = options.depth ?? defaults.depth
     let airflow = options.airflow ?? defaults.airflow
     let hum = options.hum ?? defaults.hum
+    let flutter = options.flutter ?? defaults.flutter
+    let drift = options.drift ?? defaults.drift
     let samples = renderSound(preset.soundProfile, depth: depth / 100, airflow: airflow / 100, hum: hum / 100,
-                              seconds: options.seconds, sampleRate: options.sampleRate,
+                              flutter: flutter / 100, drift: drift / 100, seconds: options.seconds, sampleRate: options.sampleRate,
                               compactSpeaker: options.compactSpeaker)
     let spectrum = PowerSpectrum(samples, sampleRate: options.sampleRate)
     let name = preset.rawValue.padding(toLength: 14, withPad: " ", startingAt: 0)

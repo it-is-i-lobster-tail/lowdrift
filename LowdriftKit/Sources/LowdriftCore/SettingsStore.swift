@@ -10,7 +10,7 @@ public protocol KeyValueStorage: AnyObject {
 
 extension UserDefaults: KeyValueStorage {}
 
-/// On-device settings: the last selected preset and each preset's three
+/// On-device settings: the last selected preset and each preset's five
 /// control values. Nothing else is stored, and nothing leaves the device.
 ///
 /// Missing, corrupt or out-of-range values fall back to the shipping defaults,
@@ -28,6 +28,8 @@ public final class SettingsStore {
         static let depth = "depth"
         static let airflow = "airflow"
         static let hum = "hum"
+        static let flutter = "flutter"
+        static let drift = "drift"
     }
 
     private let storage: KeyValueStorage
@@ -53,7 +55,10 @@ public final class SettingsStore {
         return SoundControls(
             depth: Self.validated(stored[Field.depth]) ?? defaults.depth,
             airflow: Self.validated(stored[Field.airflow]) ?? defaults.airflow,
-            hum: Self.validated(stored[Field.hum]) ?? defaults.hum
+            hum: Self.validated(stored[Field.hum]) ?? defaults.hum,
+            // Saved before these controls existed: keep the sound as it was.
+            flutter: Self.validated(stored[Field.flutter]) ?? defaults.flutter,
+            drift: Self.validated(stored[Field.drift]) ?? defaults.drift
         )
     }
 
@@ -62,6 +67,8 @@ public final class SettingsStore {
             Field.depth: controls.depth,
             Field.airflow: controls.airflow,
             Field.hum: controls.hum,
+            Field.flutter: controls.flutter,
+            Field.drift: controls.drift,
         ]
         storage.set(values, forKey: Key.controls(preset))
     }
