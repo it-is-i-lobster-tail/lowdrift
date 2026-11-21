@@ -101,7 +101,7 @@ final class SoundDesignTests: XCTestCase {
     }
 
     func testHumDoesNotChangeOverallLoudness() {
-        for preset in [Preset.boxFan, .basementAC, .towerFan] {
+        for preset in [Preset.boxFan, .basementAC, .towerFan, .windowAC, .deskFan] {
             let none = decibels(PowerSpectrum(renderPreset(preset, hum: 0, seconds: 3), sampleRate: 48_000).weightedRMS)
             let more = decibels(PowerSpectrum(renderPreset(preset, hum: 100, seconds: 3), sampleRate: 48_000).weightedRMS)
             XCTAssertEqual(none, more, accuracy: 1.0, "\(preset)")
@@ -124,5 +124,8 @@ final class SoundDesignTests: XCTestCase {
         XCTAssertLessThan(centroid(.basementAC), centroid(.softFan))
         XCTAssertLessThan(centroid(.softFan), centroid(.airVent))
         XCTAssertLessThan(centroid(.towerFan), centroid(.airVent))
+        XCTAssertLessThan(centroid(.cabinAir), centroid(.ceilingFan))
+        XCTAssertLessThan(centroid(.ceilingFan), centroid(.windowAC))
+        XCTAssertLessThan(centroid(.windowAC), centroid(.deskFan))
     }
 }

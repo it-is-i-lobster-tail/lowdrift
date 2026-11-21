@@ -1,4 +1,4 @@
-/// The six built-in sounds the engine knows how to generate.
+/// The built-in sounds the engine knows how to generate.
 public enum SoundProfile: Int, CaseIterable, Sendable {
     case softFan = 0
     case boxFan
@@ -6,6 +6,11 @@ public enum SoundProfile: Int, CaseIterable, Sendable {
     case airVent
     case towerFan
     case deepDrift
+    case ceilingFan
+    case windowAC
+    case cabinAir
+    case deskFan
+    case bedroomFan
 
     /// The tuned timbre for this profile. Read on the main thread only; the
     /// renderer copies the table once at creation.
@@ -17,6 +22,11 @@ public enum SoundProfile: Int, CaseIterable, Sendable {
         case .airVent: return .airVent
         case .towerFan: return .towerFan
         case .deepDrift: return .deepDrift
+        case .ceilingFan: return .ceilingFan
+        case .windowAC: return .windowAC
+        case .cabinAir: return .cabinAir
+        case .deskFan: return .deskFan
+        case .bedroomFan: return .bedroomFan
         }
     }
 }
@@ -49,6 +59,10 @@ public struct SoundCharacter: Sendable, Equatable {
     public var presenceHz: Float
     public var presenceQ: Float
     public var presenceBoost: Float
+    /// Fraction (0…1) of the presence band that skips the main low-pass, through a
+    /// second, steeper band-pass instead. Lets a dark sound keep a soft upper-air
+    /// band without opening the low-pass. 0 for most characters.
+    public var presenceOpen: Float
 
     // MARK: Low body / rumble layer (independent noise)
 
@@ -118,6 +132,7 @@ public struct SoundCharacter: Sendable, Equatable {
         presenceHz: Float,
         presenceQ: Float = 0.9,
         presenceBoost: Float,
+        presenceOpen: Float = 0,
         rumbleHz: Float,
         rumbleLevelDb: Float,
         humHz: Float,
@@ -152,6 +167,7 @@ public struct SoundCharacter: Sendable, Equatable {
         self.presenceHz = presenceHz
         self.presenceQ = presenceQ
         self.presenceBoost = presenceBoost
+        self.presenceOpen = presenceOpen
         self.rumbleHz = rumbleHz
         self.rumbleLevelDb = rumbleLevelDb
         self.humHz = humHz
@@ -337,5 +353,134 @@ extension SoundCharacter {
         depthLowpassOctaves: 1.6,
         depthWhooshOctaves: 0.7,
         depthRumbleDb: 6
+    )
+
+    /// Slow, wide ceiling-fan air: lazy and soft, no blade flutter, barely any motor.
+    public static let ceilingFan = SoundCharacter(
+        airHighpassHz: 55,
+        lowpassHz: 1_450,
+        lowpassQ: 0.56,
+        lowpassSpread: 2.2,
+        whooshHz: 330,
+        whooshQ: 0.5,
+        whooshBoost: 0.8,
+        presenceHz: 1_700,
+        presenceQ: 0.7,
+        presenceBoost: 0.05,
+        rumbleHz: 72,
+        rumbleLevelDb: -14,
+        humHz: 50,
+        humHarmonicsDb: SIMD8(0, -6, -12, -17, -22, -27, -32, -38),
+        humPeakTNR: 6,
+        bladeHz: 0,
+        bladeDepth: 0,
+        turbulence: 0.07,
+        drift: 0.9,
+        depthLowpassOctaves: 1.6,
+        depthWhooshOctaves: 0.8
+    )
+
+    /// Window air conditioner: a steady blower rush over a low compressor hum.
+    public static let windowAC = SoundCharacter(
+        airHighpassHz: 65,
+        lowpassHz: 2_300,
+        lowpassQ: 0.66,
+        lowpassSpread: 1.5,
+        whooshHz: 520,
+        whooshQ: 0.7,
+        whooshBoost: 1.1,
+        presenceHz: 1_600,
+        presenceQ: 0.8,
+        presenceBoost: 0.14,
+        rumbleHz: 82,
+        rumbleLevelDb: -10,
+        humHz: 60,
+        humHarmonicsDb: SIMD8(-2, 0, -4, -6, -9, -12, -16, -20),
+        humPeakTNR: 9,
+        humNoiseRatio: 2,
+        humNoiseQ: 6,
+        humNoiseDb: -7,
+        bladeHz: 41,
+        bladeDepth: 0.022,
+        turbulence: 0.08,
+        drift: 0.5
+    )
+
+    /// Aircraft cabin: a broad, even, very constant low roar.
+    public static let cabinAir = SoundCharacter(
+        airHighpassHz: 45,
+        lowpassHz: 900,
+        lowpassQ: 0.6,
+        lowpassSpread: 2.0,
+        whooshHz: 380,
+        whooshQ: 0.4,
+        whooshBoost: 1.0,
+        presenceHz: 1_300,
+        presenceQ: 0.6,
+        presenceBoost: 0.1,
+        rumbleHz: 95,
+        rumbleLevelDb: -6,
+        humHz: 115,
+        humHarmonicsDb: SIMD8(0, -6, -12, -18, -24, -30, -36, -42),
+        humPeakTNR: 6,
+        turbulence: 0.04,
+        drift: 0.25,
+        depthLowpassOctaves: 1.6,
+        depthWhooshOctaves: 0.7,
+        depthRumbleDb: 7
+    )
+
+    /// A small desk fan close by: crisper air and a light, higher motor whirr.
+    public static let deskFan = SoundCharacter(
+        airHighpassHz: 140,
+        lowpassHz: 4_000,
+        lowpassQ: 0.66,
+        lowpassSpread: 1.5,
+        whooshHz: 1_400,
+        whooshQ: 0.8,
+        whooshBoost: 1.0,
+        presenceHz: 3_600,
+        presenceQ: 0.9,
+        presenceBoost: 0.26,
+        rumbleHz: 140,
+        rumbleLevelDb: -23,
+        humHz: 104,
+        humHarmonicsDb: SIMD8(0, -3, -6, -10, -14, -18, -23, -28),
+        humPeakTNR: 7,
+        humNoiseRatio: 4,
+        humNoiseQ: 8,
+        humNoiseDb: -10,
+        bladeHz: 72,
+        bladeDepth: 0.035,
+        turbulence: 0.13,
+        drift: 0.35,
+        depthLowpassOctaves: 1.5,
+        depthWhooshOctaves: 0.7
+    )
+
+    /// Tuned to a reference recording of a bedroom pedestal fan: a warm whoosh
+    /// centred near 250 Hz that falls away quickly, a soft second air band near
+    /// 1.8 kHz, a faint blade flutter and no audible motor.
+    public static let bedroomFan = SoundCharacter(
+        airHighpassHz: 190,
+        lowpassHz: 430,
+        lowpassQ: 0.7,
+        lowpassSpread: 1.6,
+        whooshHz: 250,
+        whooshQ: 1.4,
+        whooshBoost: 5,
+        presenceHz: 1_800,
+        presenceQ: 1.3,
+        presenceBoost: 0.6,
+        presenceOpen: 1,
+        rumbleHz: 110,
+        rumbleLevelDb: -40,
+        humHz: 57,
+        humHarmonicsDb: SIMD8(0, -3, -6, -9, -13, -17, -22, -27),
+        humPeakTNR: 7,
+        bladeHz: 17,
+        bladeDepth: 0.03,
+        turbulence: 0.1,
+        drift: 0.9
     )
 }

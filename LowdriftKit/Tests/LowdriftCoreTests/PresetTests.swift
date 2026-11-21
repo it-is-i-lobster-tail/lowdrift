@@ -11,6 +11,11 @@ final class PresetTests: XCTestCase {
             (.airVent, "Air Vent", "Steady room noise.", SoundControls(depth: 30, airflow: 60, hum: 10)),
             (.towerFan, "Tower Fan", "Smooth and balanced.", SoundControls(depth: 45, airflow: 55, hum: 25)),
             (.deepDrift, "Deep Drift", "Low and airy.", SoundControls(depth: 90, airflow: 55, hum: 8)),
+            (.ceilingFan, "Ceiling Fan", "Slow, lazy circles of air.", SoundControls(depth: 50, airflow: 40, hum: 6)),
+            (.windowAC, "Window AC", "A steady blower and low hum.", SoundControls(depth: 55, airflow: 60, hum: 40)),
+            (.cabinAir, "Cabin Air", "A wide, even roar.", SoundControls(depth: 65, airflow: 60, hum: 12)),
+            (.deskFan, "Desk Fan", "A small fan close by.", SoundControls(depth: 35, airflow: 55, hum: 25)),
+            (.bedroomFan, "Bedroom Fan", "A warm, familiar whoosh.", SoundControls(depth: 50, airflow: 50, hum: 0)),
         ]
         XCTAssertEqual(Preset.allCases, expected.map(\.0), "Grid order")
         for (preset, name, subtitle, controls) in expected {

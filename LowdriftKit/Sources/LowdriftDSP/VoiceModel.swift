@@ -14,6 +14,7 @@ struct VoiceTargets: Sendable, Equatable {
     var presence: Float = 11
     var presenceQ: Float = 0.9
     var presenceGain: Float = 0
+    var presenceOpen: Float = 0
     var airLevel: Float = 0
 
     var rumble: Float = 6
@@ -43,6 +44,7 @@ struct VoiceTargets: Sendable, Equatable {
         presence += (t.presence - presence) * a
         presenceQ += (t.presenceQ - presenceQ) * a
         presenceGain += (t.presenceGain - presenceGain) * a
+        presenceOpen += (t.presenceOpen - presenceOpen) * a
         airLevel += (t.airLevel - airLevel) * a
         rumble += (t.rumble - rumble) * a
         rumbleLevel += (t.rumbleLevel - rumbleLevel) * a
@@ -195,6 +197,15 @@ private func highpass2Power(_ omega: Float, k: Float) -> Float {
     return o2 * o2 / (re * re + k * k * o2)
 }
 
+/// Two-pole low-pass as a complex value.
+@inline(__always)
+private func lowpassComplex(_ omega: Float, k: Float) -> (re: Float, im: Float) {
+    let o2 = omega * omega
+    let re = 1 - o2
+    let d = re * re + k * k * o2
+    return (re / d, -k * omega / d)
+}
+
 /// Unity-peak band-pass as a complex value.
 @inline(__always)
 private func bandpassComplex(_ omega: Float, k: Float) -> (re: Float, im: Float) {
@@ -216,7 +227,7 @@ struct AirSpec {
     var pink: (Float, Float, Float, Float, Float)
     var highpassG: Float, highpassK: Float
     var whooshG: Float, whooshK: Float, whooshGain: Float
-    var presenceG: Float, presenceK: Float, presenceGain: Float
+    var presenceG: Float, presenceK: Float, presenceGain: Float, presenceOpen: Float
     var lowpass1G: Float, lowpass2G: Float, lowpassK: Float
     var rumbleG: Float, rumbleHighpassG: Float
 
@@ -229,12 +240,30 @@ struct AirSpec {
         let hp = highpass2Power(t / highpassG, k: highpassK)
         let w = bandpassComplex(t / whooshG, k: whooshK)
         let p = bandpassComplex(t / presenceG, k: presenceK)
-        let bandsRe = whooshGain * w.re + presenceGain * p.re
-        let bandsIm = whooshGain * w.im + presenceGain * p.im
+        let closed = presenceGain * (1 - presenceOpen)
+        let bandsRe = whooshGain * w.re + closed * p.re
+        let bandsIm = whooshGain * w.im + closed * p.im
         let sumRe = 1 + bandsRe
-        let lp = lowpass2Power(t / lowpass1G, k: lowpassK) * lowpass2Power(t / lowpass2G, k: lowpassK)
-        let common = pink * hp * lp
-        return (common * (sumRe * sumRe + bandsIm * bandsIm), common * (bandsRe * bandsRe + bandsIm * bandsIm))
+        if presenceOpen <= 0 {
+            let lp = lowpass2Power(t / lowpass1G, k: lowpassK) * lowpass2Power(t / lowpass2G, k: lowpassK)
+            let common = pink * hp * lp
+            return (common * (sumRe * sumRe + bandsIm * bandsIm), common * (bandsRe * bandsRe + bandsIm * bandsIm))
+        }
+        // Part of the presence band bypasses the low-pass through a second band-pass,
+        // so the paths add as complex responses.
+        let l1 = lowpassComplex(t / lowpass1G, k: lowpassK)
+        let l2 = lowpassComplex(t / lowpass2G, k: lowpassK)
+        let lRe = l1.re * l2.re - l1.im * l2.im
+        let lIm = l1.re * l2.im + l1.im * l2.re
+        let open = presenceGain * presenceOpen
+        let ppRe = (p.re * p.re - p.im * p.im) * open
+        let ppIm = 2 * p.re * p.im * open
+        let totalRe = lRe * sumRe - lIm * bandsIm + ppRe
+        let totalIm = lRe * bandsIm + lIm * sumRe + ppIm
+        let bRe = lRe * bandsRe - lIm * bandsIm + ppRe
+        let bIm = lRe * bandsIm + lIm * bandsRe + ppIm
+        let common = pink * hp
+        return (common * (totalRe * totalRe + totalIm * totalIm), common * (bRe * bRe + bIm * bIm))
     }
 
     @inline(__always)
@@ -308,7 +337,11 @@ enum VoiceModel {
         t.whooshGain = max(c.whooshBoost * decibelsToGain(c.airflowWhooshDb * a), 0)
         t.presence = min(log2(c.presenceHz) + 0.25 * a, nyquistLimit)
         t.presenceQ = c.presenceQ
-        t.presenceGain = min(c.presenceBoost * decibelsToGain(c.airflowPresenceDb * a - c.depthPresenceDb * d), 0.6)
+        t.presenceOpen = min(max(c.presenceOpen, 0), 1)
+        // The open path has steep skirts, so it may carry a stronger band than the
+        // low-passed one without turning into hiss.
+        t.presenceGain = min(c.presenceBoost * decibelsToGain(c.airflowPresenceDb * a - c.depthPresenceDb * d),
+                             0.6 + 2.4 * t.presenceOpen)
         t.rumble = log2(c.rumbleHz) - 0.35 * d
         t.blade = log2(max(c.bladeHz, 1))
         t.bladeDepth = c.bladeHz > 0 ? min(max(c.bladeDepth * (1 + 1.2 * a), 0), 0.09) : 0
@@ -335,6 +368,7 @@ enum VoiceModel {
             presenceG: warpedCoefficient(hz: exp2(t.presence), sampleRate: fs),
             presenceK: 1 / t.presenceQ,
             presenceGain: t.presenceGain,
+            presenceOpen: t.presenceOpen,
             lowpass1G: warpedCoefficient(hz: exp2(t.lowpass1), sampleRate: fs),
             lowpass2G: warpedCoefficient(hz: exp2(t.lowpass2), sampleRate: fs),
             lowpassK: 1 / t.lowpassQ,

@@ -3,8 +3,9 @@
 A free, private, offline fan and air-conditioning sound generator for iPhone.
 Open it, pick a sound, tap Play, lock the phone.
 
-- Six procedurally generated sounds: Soft Fan, Box Fan, Basement AC, Air Vent,
-  Tower Fan and Deep Drift. Nothing is a recording or a loop. Every sample is
+- Eleven procedurally generated sounds: Soft Fan, Box Fan, Basement AC, Air Vent,
+  Tower Fan, Deep Drift, Ceiling Fan, Window AC, Cabin Air, Desk Fan and
+  Bedroom Fan. Nothing is a recording or a loop. Every sample is
   generated live from a long-period random number generator and shaped with
   lightweight filters.
 - Three plain-language controls per sound (Depth, Airflow, Hum). They are saved
@@ -33,7 +34,7 @@ runs on iOS 17 and later, on iPhone.
 |---|---|---|
 | Sound engine and app logic | `cd LowdriftKit && swift test` (macOS or Linux), or open `LowdriftKit/Package.swift` in Xcode and press ⌘U | Output bounds and non-silence, no clipping/DC/NaN, slider ranges, loudness matching, independence of the three controls, fades, crossfades, glides, restarts, sustained generation (2 min in Debug, 10 min in Release), no repetition, render cost, persistence, reset, corrupt settings, playback state machine, interruptions, route loss, retry, palette contrast |
 | AVAudioEngine integration | `swift test` on macOS, or the LowdriftKit package in Xcode on an iPhone simulator | The real `AVAudioSourceNode` render block inside a real `AVAudioEngine` (offline manual rendering): stereo and mono outputs, the same signal on every channel, unity gain through the mixer |
-| App UI | ⌘U in `Lowdrift.xcodeproj` (the Lowdrift scheme runs LowdriftUITests) | Fresh install opens on Basement AC, paused; six cards; selecting while paused stays paused; exactly three sliders; edits survive relaunch; Reset affects only that sound |
+| App UI | ⌘U in `Lowdrift.xcodeproj` (the Lowdrift scheme runs LowdriftUITests) | Fresh install opens on Basement AC, paused; all sound cards; selecting while paused stays paused; exactly three sliders; edits survive relaunch; Reset affects only that sound |
 | Eight-hour render | `cd LowdriftKit && LOWDRIFT_OVERNIGHT_TEST=1 swift test -c release --filter testOvernightRenderStaysClean` | Eight simulated hours rendered offline: no NaN, peak below the limiter ceiling, minute-to-minute level steady |
 | Privacy | `./scripts/privacy-audit.sh` | No network, tracking, recording, purchase or logging APIs in shipped code, no permission keys, empty privacy manifest |
 | Personal info | `./scripts/personal-info-check.sh` | The owner's personal information (stored only as hashes) is absent from files, commit messages, commit authors and branch names; commits use noreply emails; no home-directory paths |
@@ -55,7 +56,7 @@ version lives only in `Config/Version.xcconfig`. See
 
 ```sh
 cd LowdriftKit
-swift run -c release lowdrift-render                      # all six, 30 s each, into ./previews
+swift run -c release lowdrift-render                      # every sound, 30 s each, into ./previews
 swift run -c release lowdrift-render basementAC --seconds 120 --depth 90
 swift run -c release lowdrift-render all --speaker        # as heard through the phone's speaker
 ```

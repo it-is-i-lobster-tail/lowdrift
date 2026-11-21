@@ -2,7 +2,7 @@ import LowdriftCore
 import SwiftUI
 
 /// Lowdrift's one screen: wordmark, waves, the selected sound, Play/Pause, the
-/// six sounds and the Customize sound row.
+/// sound cards and the Customize sound row.
 struct MainView: View {
     let controller: PlaybackController
 

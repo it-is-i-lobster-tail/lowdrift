@@ -3,7 +3,8 @@ import XCTest
 /// Acceptance checks for the one-screen experience. These launch the app with a
 /// private settings domain and never press Play, so they need no audio hardware.
 final class LowdriftUITests: XCTestCase {
-    private let presets = ["softFan", "boxFan", "basementAC", "airVent", "towerFan", "deepDrift"]
+    private let presets = ["softFan", "boxFan", "basementAC", "airVent", "towerFan", "deepDrift",
+                                   "ceilingFan", "windowAC", "cabinAir", "deskFan", "bedroomFan"]
 
     override func setUp() {
         continueAfterFailure = false

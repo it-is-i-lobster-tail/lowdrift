@@ -1,7 +1,7 @@
 import LowdriftDSP
 
-/// The six built-in sounds, in the order they appear on the main screen
-/// (two columns, three rows).
+/// The built-in sounds, in the order they appear on the main screen
+/// (two columns, five rows).
 public enum Preset: String, CaseIterable, Identifiable, Sendable {
     case softFan
     case boxFan
@@ -9,6 +9,11 @@ public enum Preset: String, CaseIterable, Identifiable, Sendable {
     case airVent
     case towerFan
     case deepDrift
+    case ceilingFan
+    case windowAC
+    case cabinAir
+    case deskFan
+    case bedroomFan
 
     /// First-launch selection.
     public static let launchDefault: Preset = .basementAC
@@ -23,6 +28,11 @@ public enum Preset: String, CaseIterable, Identifiable, Sendable {
         case .airVent: return "Air Vent"
         case .towerFan: return "Tower Fan"
         case .deepDrift: return "Deep Drift"
+        case .ceilingFan: return "Ceiling Fan"
+        case .windowAC: return "Window AC"
+        case .cabinAir: return "Cabin Air"
+        case .deskFan: return "Desk Fan"
+        case .bedroomFan: return "Bedroom Fan"
         }
     }
 
@@ -35,6 +45,11 @@ public enum Preset: String, CaseIterable, Identifiable, Sendable {
         case .airVent: return "Steady room noise."
         case .towerFan: return "Smooth and balanced."
         case .deepDrift: return "Low and airy."
+        case .ceilingFan: return "Slow, lazy circles of air."
+        case .windowAC: return "A steady blower and low hum."
+        case .cabinAir: return "A wide, even roar."
+        case .deskFan: return "A small fan close by."
+        case .bedroomFan: return "A warm, familiar whoosh."
         }
     }
 
@@ -47,6 +62,11 @@ public enum Preset: String, CaseIterable, Identifiable, Sendable {
         case .airVent: return "Airy"
         case .towerFan: return "Balanced"
         case .deepDrift: return "Low, smooth"
+        case .ceilingFan: return "Slow, soft"
+        case .windowAC: return "Steady hum"
+        case .cabinAir: return "Smooth roar"
+        case .deskFan: return "Close, bright"
+        case .bedroomFan: return "Warm, low"
         }
     }
 
@@ -59,6 +79,11 @@ public enum Preset: String, CaseIterable, Identifiable, Sendable {
         case .airVent: return SoundControls(depth: 30, airflow: 60, hum: 10)
         case .towerFan: return SoundControls(depth: 45, airflow: 55, hum: 25)
         case .deepDrift: return SoundControls(depth: 90, airflow: 55, hum: 8)
+        case .ceilingFan: return SoundControls(depth: 50, airflow: 40, hum: 6)
+        case .windowAC: return SoundControls(depth: 55, airflow: 60, hum: 40)
+        case .cabinAir: return SoundControls(depth: 65, airflow: 60, hum: 12)
+        case .deskFan: return SoundControls(depth: 35, airflow: 55, hum: 25)
+        case .bedroomFan: return SoundControls(depth: 50, airflow: 50, hum: 0)
         }
     }
 
@@ -71,6 +96,11 @@ public enum Preset: String, CaseIterable, Identifiable, Sendable {
         case .airVent: return .airVent
         case .towerFan: return .towerFan
         case .deepDrift: return .deepDrift
+        case .ceilingFan: return .ceilingFan
+        case .windowAC: return .windowAC
+        case .cabinAir: return .cabinAir
+        case .deskFan: return .deskFan
+        case .bedroomFan: return .bedroomFan
         }
     }
 }

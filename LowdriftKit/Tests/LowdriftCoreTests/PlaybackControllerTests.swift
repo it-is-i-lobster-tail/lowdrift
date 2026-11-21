@@ -272,10 +272,10 @@ final class PlaybackControllerTests: XCTestCase {
             for i in 0 ..< 500 {
                 switch i % 5 {
                 case 0: controller.togglePlayback()
-                case 1: controller.select(Preset.allCases[i % 6])
+                case 1: controller.select(Preset.allCases[i % Preset.allCases.count])
                 case 2: controller.setDepth(Double(i % 101))
                 case 3: controller.togglePlayback()
-                default: controller.select(Preset.allCases[(i / 5) % 6])
+                default: controller.select(Preset.allCases[(i / 5) % Preset.allCases.count])
                 }
                 XCTAssertEqual(controller.isPlaying, output.isRunning)
             }

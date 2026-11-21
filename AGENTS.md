@@ -23,8 +23,9 @@ It is not a DAW. Read the README for the layout and how to test.
     slider.
 - Launch selects the last-used sound (Basement AC on first launch) and stays
   paused. Never start audio the user didn't ask for.
-- The six sounds keep their names, subtitles and order: Soft Fan, Box Fan,
-  Basement AC, Air Vent, Tower Fan, Deep Drift.
+- The eleven sounds keep their names, subtitles and order: Soft Fan, Box Fan,
+  Basement AC, Air Vent, Tower Fan, Deep Drift, Ceiling Fan, Window AC,
+  Cabin Air, Desk Fan, Bedroom Fan.
 
 ## Sound
 

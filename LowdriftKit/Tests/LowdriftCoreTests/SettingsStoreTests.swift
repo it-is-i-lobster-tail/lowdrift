@@ -52,7 +52,7 @@ final class SettingsStoreTests: XCTestCase {
         let store = SettingsStore(storage: storage)
         let defaults = Preset.basementAC.defaultControls
 
-        storage.values[SettingsStore.Key.selectedPreset] = "ceilingFan"
+        storage.values[SettingsStore.Key.selectedPreset] = "jetEngine"
         XCTAssertEqual(store.selectedPreset, .basementAC, "Unknown preset ids fall back to the launch default")
         storage.values[SettingsStore.Key.selectedPreset] = 42
         XCTAssertEqual(store.selectedPreset, .basementAC)

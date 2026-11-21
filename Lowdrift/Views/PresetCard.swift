@@ -91,6 +91,21 @@ extension Preset {
         case .deepDrift:
             return [WaveLine(baseline: 0.5, amplitude: 0.3, wavelength: 1.3),
                     WaveLine(baseline: 0.82, amplitude: 0.12, wavelength: 1.6, phase: 2.8)]
+        case .ceilingFan:
+            return [WaveLine(baseline: 0.5, amplitude: 0.2, wavelength: 1.1),
+                    WaveLine(baseline: 0.78, amplitude: 0.1, wavelength: 1.2, phase: 2.2)]
+        case .windowAC:
+            return [WaveLine(baseline: 0.45, amplitude: 0.24, wavelength: 0.6),
+                    WaveLine(baseline: 0.78, amplitude: 0.16, wavelength: 0.45, phase: 0.8)]
+        case .cabinAir:
+            return [WaveLine(baseline: 0.48, amplitude: 0.22, wavelength: 1.0),
+                    WaveLine(baseline: 0.78, amplitude: 0.16, wavelength: 1.0, phase: 1.6)]
+        case .deskFan:
+            return [WaveLine(baseline: 0.42, amplitude: 0.18, wavelength: 0.36),
+                    WaveLine(baseline: 0.72, amplitude: 0.12, wavelength: 0.28, phase: 1.9)]
+        case .bedroomFan:
+            return [WaveLine(baseline: 0.48, amplitude: 0.26, wavelength: 0.75),
+                    WaveLine(baseline: 0.8, amplitude: 0.1, wavelength: 0.7, phase: 2.6)]
         }
     }
 }

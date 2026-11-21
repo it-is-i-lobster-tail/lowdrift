@@ -16,6 +16,7 @@ struct Voice {
     private var airHighpass = StateVariableFilter()
     private var whooshBand = StateVariableFilter()
     private var presenceBand = StateVariableFilter()
+    private var presenceOpenBand = StateVariableFilter()
     private var lowpass1 = StateVariableFilter()
     private var lowpass2 = StateVariableFilter()
     private var rumbleLowpass1 = StateVariableFilter()
@@ -35,6 +36,7 @@ struct Voice {
 
     private var whooshGain = Ramp()
     private var presenceGain = Ramp()
+    private var presenceOpenGain = Ramp()
     private var airLevel = Ramp()
     private var rumbleLevel = Ramp()
     private var bladeDepth = Ramp()
@@ -64,7 +66,7 @@ struct Voice {
         target = targets
         current = targets
         pink.reset()
-        airHighpass.reset(); whooshBand.reset(); presenceBand.reset()
+        airHighpass.reset(); whooshBand.reset(); presenceBand.reset(); presenceOpenBand.reset()
         lowpass1.reset(); lowpass2.reset()
         rumbleLowpass1.reset(); rumbleLowpass2.reset(); rumbleHighpass.reset()
         humNoiseBand.reset()
@@ -72,7 +74,8 @@ struct Voice {
         humOscillator.reset()
         bladeOscillator.reset()
         whooshGain.snap(to: targets.whooshGain)
-        presenceGain.snap(to: targets.presenceGain)
+        presenceGain.snap(to: targets.presenceGain * (1 - targets.presenceOpen))
+        presenceOpenGain.snap(to: targets.presenceGain * targets.presenceOpen)
         airLevel.snap(to: targets.airLevel)
         rumbleLevel.snap(to: targets.rumbleLevel)
         bladeDepth.snap(to: targets.bladeDepth)
@@ -99,8 +102,9 @@ struct Voice {
                                  q: current.lowpassQ)
         whooshBand.setCoefficients(g: warpedCoefficient(hz: exp2(current.whoosh + 0.05 * b), sampleRate: fs),
                                    q: current.whooshQ)
-        presenceBand.setCoefficients(g: warpedCoefficient(hz: exp2(current.presence), sampleRate: fs),
-                                     q: current.presenceQ)
+        let presenceG = warpedCoefficient(hz: exp2(current.presence), sampleRate: fs)
+        presenceBand.setCoefficients(g: presenceG, q: current.presenceQ)
+        presenceOpenBand.setCoefficients(g: presenceG, q: current.presenceQ)
         let rumbleG = warpedCoefficient(hz: exp2(current.rumble), sampleRate: fs)
         rumbleLowpass1.setCoefficients(g: rumbleG, q: 1 / VoiceModel.rumbleK)
         rumbleLowpass2.setCoefficients(g: rumbleG, q: 1 / VoiceModel.rumbleK)
@@ -112,7 +116,8 @@ struct Voice {
 
         let flutterGain = 1 + current.turbulence * turbulence
         whooshGain.ramp(to: current.whooshGain * flutterGain, frames: frames)
-        presenceGain.ramp(to: current.presenceGain * flutterGain, frames: frames)
+        presenceGain.ramp(to: current.presenceGain * (1 - current.presenceOpen) * flutterGain, frames: frames)
+        presenceOpenGain.ramp(to: current.presenceGain * current.presenceOpen * flutterGain, frames: frames)
         airLevel.ramp(to: current.airLevel * (1 + 0.035 * b), frames: frames)
         rumbleLevel.ramp(to: current.rumbleLevel * (1 + 0.08 * a), frames: frames)
         bladeDepth.ramp(to: current.bladeDepth, frames: frames)
@@ -138,6 +143,7 @@ struct Voice {
         let body = whooshBand.bandpass(shaped)
         let presence = presenceBand.bandpass(shaped)
         var air = lowpass2.lowpass(lowpass1.lowpass(shaped + whooshGain.value * body + presenceGain.value * presence))
+            + presenceOpenGain.value * presenceOpenBand.bandpass(presence)
         bladeOscillator.advance()
         air *= 1 + bladeDepth.value * bladeOscillator.sine
 
@@ -170,6 +176,7 @@ struct Voice {
 
         whooshGain.tick()
         presenceGain.tick()
+        presenceOpenGain.tick()
         airLevel.tick()
         rumbleLevel.tick()
         bladeDepth.tick()

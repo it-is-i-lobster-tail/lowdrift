@@ -1,7 +1,7 @@
 import AppIntents
 import LowdriftCore
 
-/// The six sounds as Shortcuts and Siri see them.
+/// The built-in sounds as Shortcuts and Siri see them.
 enum SoundOption: String, AppEnum {
     case softFan
     case boxFan
@@ -9,6 +9,11 @@ enum SoundOption: String, AppEnum {
     case airVent
     case towerFan
     case deepDrift
+    case ceilingFan
+    case windowAC
+    case cabinAir
+    case deskFan
+    case bedroomFan
 
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Sound"
 
@@ -19,6 +24,11 @@ enum SoundOption: String, AppEnum {
         .airVent: "Air Vent",
         .towerFan: "Tower Fan",
         .deepDrift: "Deep Drift",
+        .ceilingFan: "Ceiling Fan",
+        .windowAC: "Window AC",
+        .cabinAir: "Cabin Air",
+        .deskFan: "Desk Fan",
+        .bedroomFan: "Bedroom Fan",
     ]
 
     var preset: Preset {
@@ -29,6 +39,11 @@ enum SoundOption: String, AppEnum {
         case .airVent: return .airVent
         case .towerFan: return .towerFan
         case .deepDrift: return .deepDrift
+        case .ceilingFan: return .ceilingFan
+        case .windowAC: return .windowAC
+        case .cabinAir: return .cabinAir
+        case .deskFan: return .deskFan
+        case .bedroomFan: return .bedroomFan
         }
     }
 }
