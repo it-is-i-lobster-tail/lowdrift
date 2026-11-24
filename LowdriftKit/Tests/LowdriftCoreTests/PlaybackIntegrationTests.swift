@@ -78,7 +78,7 @@ final class PlaybackIntegrationTests: XCTestCase {
             XCTAssertTrue(pausing.suffix(4_800).allSatisfy { $0 == 0 }, "Fades to true silence")
             XCTAssertFalse(output.isRunning, "The engine stops once silent (no work while paused)")
 
-            controller.select(.airVent)
+            controller.select(.towerFan)
             XCTAssertTrue(output.pull(seconds: 1).isEmpty, "Selecting while paused stays silent")
             XCTAssertFalse(controller.isPlaying)
 

@@ -3,7 +3,7 @@ import XCTest
 /// Acceptance checks for the one-screen experience. These launch the app with a
 /// private settings domain and never press Play, so they need no audio hardware.
 final class LowdriftUITests: XCTestCase {
-    private let presets = ["softFan", "boxFan", "basementAC", "airVent", "towerFan", "deepDrift",
+    private let presets = ["softFan", "boxFan", "basementAC", "towerFan", "deepDrift",
                                    "ceilingFan", "windowAC", "cabinAir", "deskFan", "bedroomFan"]
 
     override func setUp() {
@@ -38,11 +38,11 @@ final class LowdriftUITests: XCTestCase {
 
     func testSelectingASoundWhilePausedStaysPaused() {
         let app = launch(resetSettings: true)
-        app.buttons["preset.airVent"].tap()
-        XCTAssertTrue(app.buttons["preset.airVent"].isSelected)
+        app.buttons["preset.towerFan"].tap()
+        XCTAssertTrue(app.buttons["preset.towerFan"].isSelected)
         XCTAssertFalse(app.buttons["preset.basementAC"].isSelected)
-        XCTAssertTrue(selectedSound(app).label.contains("Air Vent"))
-        XCTAssertTrue(selectedSound(app).label.contains("Steady room noise."))
+        XCTAssertTrue(selectedSound(app).label.contains("Tower Fan"))
+        XCTAssertTrue(selectedSound(app).label.contains("Smooth and balanced."))
         XCTAssertEqual(app.buttons["playPause"].label, "Play")
     }
 

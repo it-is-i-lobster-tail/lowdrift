@@ -6,7 +6,6 @@ enum SoundOption: String, AppEnum {
     case softFan
     case boxFan
     case basementAC
-    case airVent
     case towerFan
     case deepDrift
     case ceilingFan
@@ -21,7 +20,6 @@ enum SoundOption: String, AppEnum {
         .softFan: "Soft Fan",
         .boxFan: "Box Fan",
         .basementAC: "Basement AC",
-        .airVent: "Air Vent",
         .towerFan: "Tower Fan",
         .deepDrift: "Deep Drift",
         .ceilingFan: "Ceiling Fan",
@@ -36,7 +34,6 @@ enum SoundOption: String, AppEnum {
         case .softFan: return .softFan
         case .boxFan: return .boxFan
         case .basementAC: return .basementAC
-        case .airVent: return .airVent
         case .towerFan: return .towerFan
         case .deepDrift: return .deepDrift
         case .ceilingFan: return .ceilingFan

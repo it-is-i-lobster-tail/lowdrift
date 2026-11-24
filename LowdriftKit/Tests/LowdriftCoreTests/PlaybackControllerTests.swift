@@ -62,14 +62,14 @@ final class PlaybackControllerTests: XCTestCase {
     nonisolated func testRelaunchRestoresLastPresetButStaysPaused() {
         onMainActor {
             let first = makeController()
-            first.select(.airVent)
+            first.select(.towerFan)
             first.setDepth(12)
             first.play()
             XCTAssertTrue(first.isPlaying)
 
             output = FakeOutput()
             let relaunched = makeController()
-            XCTAssertEqual(relaunched.selectedPreset, .airVent)
+            XCTAssertEqual(relaunched.selectedPreset, .towerFan)
             XCTAssertEqual(relaunched.controls.depth, 12)
             XCTAssertFalse(relaunched.isPlaying, "Playback never resumes on a cold launch")
             XCTAssertEqual(output.startCount, 0)

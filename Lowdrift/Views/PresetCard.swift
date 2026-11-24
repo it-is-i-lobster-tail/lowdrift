@@ -82,9 +82,6 @@ extension Preset {
         case .basementAC:
             return [WaveLine(baseline: 0.45, amplitude: 0.32, wavelength: 0.8),
                     WaveLine(baseline: 0.8, amplitude: 0.14, wavelength: 1.1, phase: 2)]
-        case .airVent:
-            return [WaveLine(baseline: 0.4, amplitude: 0.14, wavelength: 0.3),
-                    WaveLine(baseline: 0.7, amplitude: 0.1, wavelength: 0.35, phase: 1)]
         case .towerFan:
             return [WaveLine(baseline: 0.45, amplitude: 0.22, wavelength: 0.42),
                     WaveLine(baseline: 0.75, amplitude: 0.12, wavelength: 0.6, phase: 2.4)]

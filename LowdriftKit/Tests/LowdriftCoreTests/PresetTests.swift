@@ -8,7 +8,6 @@ final class PresetTests: XCTestCase {
             (.softFan, "Soft Fan", "A gentle, steady flow.", SoundControls(depth: 35, airflow: 35, hum: 10)),
             (.boxFan, "Box Fan", "Classic and consistent.", SoundControls(depth: 55, airflow: 65, hum: 30)),
             (.basementAC, "Basement AC", "Deep and enveloping.", SoundControls(depth: 80, airflow: 70, hum: 35)),
-            (.airVent, "Air Vent", "Steady room noise.", SoundControls(depth: 30, airflow: 60, hum: 10)),
             (.towerFan, "Tower Fan", "Smooth and balanced.", SoundControls(depth: 45, airflow: 55, hum: 25)),
             (.deepDrift, "Deep Drift", "Low and airy.", SoundControls(depth: 90, airflow: 55, hum: 8)),
             (.ceilingFan, "Ceiling Fan", "Slow, lazy circles of air.", SoundControls(depth: 50, airflow: 40, hum: 6)),

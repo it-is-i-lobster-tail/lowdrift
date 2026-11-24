@@ -11,7 +11,7 @@ final class SustainedGenerationTests: XCTestCase {
     func testSustainedGenerationIsStable() {
         // Ten simulated minutes in optimised builds, two in debug builds.
         let minutes = isOptimizedBuild ? 10 : 2
-        for preset in [Preset.basementAC, .airVent] {
+        for preset in [Preset.basementAC, .towerFan] {
             let renderer = playingRenderer(preset)
             var levels: [Double] = []
             for _ in 0 ..< minutes * 6 {

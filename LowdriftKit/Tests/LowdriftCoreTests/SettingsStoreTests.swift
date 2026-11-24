@@ -38,12 +38,18 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.controls(for: .boxFan), Preset.boxFan.defaultControls)
     }
 
+    func testRemovedPresetFallsBackToLaunchDefault() {
+        let storage = InMemoryStorage()
+        storage.set("airVent", forKey: "lowdrift.v1.selectedPreset")
+        XCTAssertEqual(SettingsStore(storage: storage).selectedPreset, Preset.launchDefault)
+    }
+
     func testResetRestoresOnlyThatPreset() {
         let store = SettingsStore(storage: InMemoryStorage())
-        store.setControls(SoundControls(depth: 5, airflow: 5, hum: 5), for: .airVent)
+        store.setControls(SoundControls(depth: 5, airflow: 5, hum: 5), for: .towerFan)
         store.setControls(SoundControls(depth: 6, airflow: 6, hum: 6), for: .boxFan)
-        store.resetControls(for: .airVent)
-        XCTAssertEqual(store.controls(for: .airVent), Preset.airVent.defaultControls)
+        store.resetControls(for: .towerFan)
+        XCTAssertEqual(store.controls(for: .towerFan), Preset.towerFan.defaultControls)
         XCTAssertEqual(store.controls(for: .boxFan), SoundControls(depth: 6, airflow: 6, hum: 6))
     }
 

@@ -3,7 +3,6 @@ public enum SoundProfile: Int, CaseIterable, Sendable {
     case softFan = 0
     case boxFan
     case basementAC
-    case airVent
     case towerFan
     case deepDrift
     case ceilingFan
@@ -19,7 +18,6 @@ public enum SoundProfile: Int, CaseIterable, Sendable {
         case .softFan: return .softFan
         case .boxFan: return .boxFan
         case .basementAC: return .basementAC
-        case .airVent: return .airVent
         case .towerFan: return .towerFan
         case .deepDrift: return .deepDrift
         case .ceilingFan: return .ceilingFan
@@ -276,30 +274,6 @@ extension SoundCharacter {
         depthLowpassOctaves: 1.8,
         depthWhooshOctaves: 0.9,
         depthRumbleDb: 9
-    )
-
-    /// Airier, slightly brighter diffuse ventilation; minimal motor.
-    public static let airVent = SoundCharacter(
-        airHighpassHz: 95,
-        lowpassHz: 4_600,
-        lowpassQ: 0.6,
-        lowpassSpread: 1.8,
-        whooshHz: 900,
-        whooshQ: 0.45,
-        whooshBoost: 0.45,
-        presenceHz: 3_100,
-        presenceQ: 0.7,
-        presenceBoost: 0.3,
-        rumbleHz: 105,
-        rumbleLevelDb: -19,
-        humHz: 92,
-        humHarmonicsDb: SIMD8(0, -5, -10, -14, -19, -24, -30, -36),
-        humPeakTNR: 5,
-        turbulence: 0.15,
-        drift: 0.35,
-        depthLowpassOctaves: 1.4,
-        depthWhooshOctaves: 0.7,
-        depthPresenceDb: 9
     )
 
     /// Tighter, more focused fan texture with mild upper-air presence.

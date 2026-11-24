@@ -3,7 +3,7 @@
 A free, private, offline fan and air-conditioning sound generator for iPhone.
 Open it, pick a sound, tap Play, lock the phone.
 
-- Eleven procedurally generated sounds: Soft Fan, Box Fan, Basement AC, Air Vent,
+- Ten procedurally generated sounds: Soft Fan, Box Fan, Basement AC,
   Tower Fan, Deep Drift, Ceiling Fan, Window AC, Cabin Air, Desk Fan and
   Bedroom Fan. Nothing is a recording or a loop. Every sample is
   generated live from a long-period random number generator and shaped with

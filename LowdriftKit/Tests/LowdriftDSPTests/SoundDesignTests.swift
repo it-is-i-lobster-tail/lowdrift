@@ -122,8 +122,6 @@ final class SoundDesignTests: XCTestCase {
         func centroid(_ preset: Preset) -> Double { PowerSpectrum(renderPreset(preset, seconds: 3), sampleRate: 48_000).centroid }
         XCTAssertLessThan(centroid(.deepDrift), centroid(.basementAC))
         XCTAssertLessThan(centroid(.basementAC), centroid(.softFan))
-        XCTAssertLessThan(centroid(.softFan), centroid(.airVent))
-        XCTAssertLessThan(centroid(.towerFan), centroid(.airVent))
         XCTAssertLessThan(centroid(.cabinAir), centroid(.ceilingFan))
         XCTAssertLessThan(centroid(.ceilingFan), centroid(.windowAC))
         XCTAssertLessThan(centroid(.windowAC), centroid(.deskFan))

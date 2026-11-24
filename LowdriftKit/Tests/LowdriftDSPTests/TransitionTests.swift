@@ -34,7 +34,7 @@ final class TransitionTests: XCTestCase {
     }
 
     func testPauseThenQuickResumeDoesNotDip() {
-        let renderer = playingRenderer(.airVent)
+        let renderer = playingRenderer(.towerFan)
         let before = Signal.rms(render(renderer, frames: 9_600))
         renderer.fadeOut()
         _ = render(renderer, frames: 4_800)
@@ -45,7 +45,7 @@ final class TransitionTests: XCTestCase {
     }
 
     func testPresetCrossfadeHasNoGapOrJump() {
-        let pairs: [(Preset, Preset)] = [(.basementAC, .airVent), (.softFan, .deepDrift), (.towerFan, .boxFan)]
+        let pairs: [(Preset, Preset)] = [(.basementAC, .deskFan), (.softFan, .deepDrift), (.towerFan, .boxFan)]
         for (from, to) in pairs {
             let renderer = playingRenderer(from)
             let before = PowerSpectrum(render(renderer, frames: Int(rate)), sampleRate: rate).weightedRMS
