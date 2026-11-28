@@ -109,7 +109,7 @@ struct LegalDocument: Identifiable {
             ),
             Section(
                 heading: "Your privacy",
-                body: "Lowdrift collects no data. See the Privacy Policy in Settings for details."
+                body: "Lowdrift collects no data. See the Privacy Policy in Settings → Legal for details."
             ),
             Section(
                 heading: "Ownership",

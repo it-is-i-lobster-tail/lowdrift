@@ -103,6 +103,14 @@ final class LowdriftUITests: XCTestCase {
         XCTAssertTrue(app.buttons["closeSettings"].waitForExistence(timeout: 5))
     }
 
+    /// Settings → a row of the menu (Sounds or Legal).
+    private func openSettings(_ app: XCUIApplication, row: String) {
+        openSettings(app)
+        let link = app.buttons["settings.\(row)"]
+        XCTAssertTrue(link.waitForExistence(timeout: 5))
+        link.tap()
+    }
+
     /// Flips a Settings switch. On recent iOS the row's own center is the label,
     /// so tap the switch itself.
     private func flip(_ toggle: XCUIElement) {
@@ -120,7 +128,7 @@ final class LowdriftUITests: XCTestCase {
 
     func testSettingsChoosesSoundsAndFavoritesPinToTop() {
         var app = launch(resetSettings: true)
-        openSettings(app)
+        openSettings(app, row: "sounds")
 
         let showCabinAir = app.switches["show.cabinAir"]
         XCTAssertTrue(showCabinAir.waitForExistence(timeout: 5))
@@ -163,8 +171,9 @@ final class LowdriftUITests: XCTestCase {
 
     func testTermsAndPrivacyPolicyOpenFromSettings() {
         let app = launch(resetSettings: true)
-        openSettings(app)
+        openSettings(app, row: "legal")
 
+        XCTAssertTrue(app.buttons["termsOfService"].waitForExistence(timeout: 5))
         app.buttons["termsOfService"].tap()
         XCTAssertTrue(app.navigationBars["Terms of Service"].waitForExistence(timeout: 5))
         app.navigationBars["Terms of Service"].buttons.firstMatch.tap()

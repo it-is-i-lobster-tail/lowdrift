@@ -14,7 +14,7 @@ Lowdrift collects nothing.
   sounds are favorites are stored in the app's own `UserDefaults` on the
   iPhone. They are never transmitted and are removed when the app is deleted.
 
-The app shows the same promise in Settings → Privacy Policy, alongside the
+The app shows the same promise in Settings → Legal → Privacy Policy, alongside the
 Terms of Service. Both are bundled text (`Lowdrift/Views/LegalDocumentView.swift`),
 so nothing is loaded from the web.
 
