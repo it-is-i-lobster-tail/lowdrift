@@ -104,9 +104,12 @@ public final class AudioEngineOutput: AudioOutput {
         do {
             if !categoryConfigured {
                 try session.setCategory(.playback, mode: .default, options: [])
-                // Large hardware buffers mean fewer wake-ups overnight; latency
-                // only affects how quickly a slider move is heard (~50 ms).
-                try? session.setPreferredIOBufferDuration(0.05)
+                // Ask for the largest hardware buffer iOS allows (it clamps the
+                // request, typically to 4,096 frames, about 85 ms at 48 kHz): the
+                // audio thread then wakes about 12 times a second rather than the
+                // ~23 of the earlier 50 ms request. Latency only delays when a tap
+                // or a slider move starts to be heard, and those fade or glide anyway.
+                try? session.setPreferredIOBufferDuration(0.1)
                 categoryConfigured = true
             }
             try session.setActive(true)
