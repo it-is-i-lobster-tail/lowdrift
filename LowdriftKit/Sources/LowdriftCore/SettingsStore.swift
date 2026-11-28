@@ -10,14 +10,17 @@ public protocol KeyValueStorage: AnyObject {
 
 extension UserDefaults: KeyValueStorage {}
 
-/// On-device settings: the last selected preset and each preset's five
-/// control values. Nothing else is stored, and nothing leaves the device.
+/// On-device settings: the last selected preset, each preset's five control
+/// values, which sounds appear on the main screen and which are favorites.
+/// Nothing else is stored, and nothing leaves the device.
 ///
 /// Missing, corrupt or out-of-range values fall back to the shipping defaults,
 /// field by field, so a damaged entry can never break launch or playback.
 public final class SettingsStore {
     public enum Key {
         public static let selectedPreset = "lowdrift.v1.selectedPreset"
+        public static let visiblePresets = "lowdrift.v1.visiblePresets"
+        public static let favoritePresets = "lowdrift.v1.favoritePresets"
 
         public static func controls(_ preset: Preset) -> String {
             "lowdrift.v1.controls.\(preset.rawValue)"
@@ -49,6 +52,23 @@ public final class SettingsStore {
         set { storage.set(newValue.rawValue, forKey: Key.selectedPreset) }
     }
 
+    /// Sounds shown on the main screen. The default six on first launch, and
+    /// again if the saved list is missing, damaged or names no current sound.
+    public var visiblePresets: Set<Preset> {
+        get {
+            let stored = Self.presets(storage.object(forKey: Key.visiblePresets))
+            guard let stored, !stored.isEmpty else { return Preset.defaultVisible }
+            return stored
+        }
+        set { storage.set(Self.rawValues(newValue), forKey: Key.visiblePresets) }
+    }
+
+    /// Sounds pinned to the top of the main screen. None by default.
+    public var favoritePresets: Set<Preset> {
+        get { Self.presets(storage.object(forKey: Key.favoritePresets)) ?? [] }
+        set { storage.set(Self.rawValues(newValue), forKey: Key.favoritePresets) }
+    }
+
     public func controls(for preset: Preset) -> SoundControls {
         let defaults = preset.defaultControls
         guard let stored = storage.object(forKey: Key.controls(preset)) as? [String: Any] else { return defaults }
@@ -76,6 +96,17 @@ public final class SettingsStore {
     /// Restores one preset's shipping values; other presets are untouched.
     public func resetControls(for preset: Preset) {
         storage.removeObject(forKey: Key.controls(preset))
+    }
+
+    /// Names of sounds that no longer exist are dropped.
+    private static func presets(_ value: Any?) -> Set<Preset>? {
+        guard let raw = value as? [Any] else { return nil }
+        return Set(raw.compactMap { ($0 as? String).flatMap(Preset.init(rawValue:)) })
+    }
+
+    /// Stored in a fixed order so the saved value doesn't churn.
+    private static func rawValues(_ presets: Set<Preset>) -> [String] {
+        Preset.allCases.filter(presets.contains).map(\.rawValue)
     }
 
     /// A stored number is accepted only if it is finite and within the control

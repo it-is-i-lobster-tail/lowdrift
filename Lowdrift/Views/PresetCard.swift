@@ -1,23 +1,30 @@
 import LowdriftCore
 import SwiftUI
 
-/// The 2 × 3 grid of sounds (one column at accessibility text sizes).
+/// The two-column grid of the sounds chosen in Settings, favorites first (one
+/// column at accessibility text sizes). Long-press a card to favorite it.
 struct PresetGrid: View {
+    let presets: [Preset]
+    let favorites: Set<Preset>
     let selected: Preset
     let select: (Preset) -> Void
+    let toggleFavorite: (Preset) -> Void
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         let columns = dynamicTypeSize.isAccessibilitySize ? 1 : 2
-        let presets = Preset.allCases
         VStack(spacing: 12) {
             ForEach(Array(stride(from: 0, to: presets.count, by: columns)), id: \.self) { start in
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(presets[start ..< min(start + columns, presets.count)]) { preset in
-                        PresetCard(preset: preset, isSelected: preset == selected) {
-                            select(preset)
-                        }
+                        PresetCard(
+                            preset: preset,
+                            isSelected: preset == selected,
+                            isFavorite: favorites.contains(preset),
+                            action: { select(preset) },
+                            toggleFavorite: { toggleFavorite(preset) }
+                        )
                     }
                 }
                 // Cards in a row share the height of the tallest one.
@@ -30,14 +37,30 @@ struct PresetGrid: View {
 struct PresetCard: View {
     let preset: Preset
     let isSelected: Bool
+    let isFavorite: Bool
     let action: () -> Void
+    let toggleFavorite: () -> Void
+
+    private var favoriteActionName: String {
+        isFavorite ? "Remove from Favorites" : "Add to Favorites"
+    }
 
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 6) {
-                WaveMotif(lines: preset.motif)
-                    .frame(width: 44, height: 18)
-                    .padding(.bottom, 4)
+                HStack(alignment: .top) {
+                    WaveMotif(lines: preset.motif)
+                        .frame(width: 44, height: 18)
+                    Spacer(minLength: 8)
+                    if isFavorite {
+                        Image(systemName: "heart.fill")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(Theme.accent)
+                            .transition(.opacity)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .padding(.bottom, 4)
                 Text(preset.name)
                     .font(.headline)
                     .foregroundStyle(Theme.primaryText)
@@ -61,10 +84,16 @@ struct PresetCard: View {
             .animation(.easeInOut(duration: 0.2), value: isSelected)
         }
         .buttonStyle(PressableButtonStyle())
+        .contextMenu {
+            Button(action: toggleFavorite) {
+                Label(favoriteActionName, systemImage: isFavorite ? "heart.slash" : "heart")
+            }
+        }
         .accessibilityLabel(preset.name)
-        .accessibilityValue(preset.cardDescription)
+        .accessibilityValue(isFavorite ? "Favorite, \(preset.cardDescription)" : preset.cardDescription)
         .accessibilityHint(isSelected ? "" : "Selects this sound.")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityAction(named: Text(favoriteActionName), toggleFavorite)
         .accessibilityIdentifier("preset.\(preset.rawValue)")
     }
 }

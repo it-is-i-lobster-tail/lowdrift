@@ -10,16 +10,19 @@ final class AppEnvironment {
     static let shared = AppEnvironment()
 
     let controller: PlaybackController
+    let library: SoundLibrary
     private let output: AudioEngineOutput
     private let session: AudioSessionCoordinator
     private let nowPlaying: NowPlayingCenter
 
     private init() {
         let output = AudioEngineOutput()
-        let controller = PlaybackController(store: SettingsStore(storage: Self.makeStorage()), output: output)
+        let store = SettingsStore(storage: Self.makeStorage())
+        let controller = PlaybackController(store: store, output: output)
         let nowPlaying = NowPlayingCenter(controller: controller, artworkImage: UIImage(named: "NowPlayingArtwork"))
         self.output = output
         self.controller = controller
+        library = SoundLibrary(store: store)
         self.nowPlaying = nowPlaying
         session = AudioSessionCoordinator(controller: controller, output: output)
 

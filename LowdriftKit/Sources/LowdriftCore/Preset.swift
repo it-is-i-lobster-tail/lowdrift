@@ -1,7 +1,7 @@
 import LowdriftDSP
 
-/// The built-in sounds, in the order they appear on the main screen
-/// (two columns, five rows).
+/// The built-in sounds. The main screen shows the ones the person chose, with
+/// favorites first and the rest A to Z (see `SoundLibrary`).
 public enum Preset: String, CaseIterable, Identifiable, Sendable {
     case softFan
     case boxFan
@@ -16,6 +16,16 @@ public enum Preset: String, CaseIterable, Identifiable, Sendable {
 
     /// First-launch selection.
     public static let launchDefault: Preset = .basementAC
+
+    /// The six sounds on the main screen until the person picks their own.
+    public static let defaultVisible: Set<Preset> = [
+        .softFan, .boxFan, .basementAC, .towerFan, .deepDrift, .bedroomFan,
+    ]
+
+    /// Alphabetical by name, the way the main screen and Settings list sounds.
+    public static func alphabetical(_ presets: some Sequence<Preset>) -> [Preset] {
+        presets.sorted { $0.name.lowercased() < $1.name.lowercased() }
+    }
 
     public var id: String { rawValue }
 

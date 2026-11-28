@@ -6,7 +6,7 @@ struct LowdriftApp: App {
 
     var body: some Scene {
         WindowGroup {
-            MainView(controller: AppEnvironment.shared.controller)
+            MainView(controller: AppEnvironment.shared.controller, library: AppEnvironment.shared.library)
                 .tint(Theme.accent)
                 .onChange(of: scenePhase) { _, phase in
                     // Coming back to the app: make sure Play/Pause shows what the

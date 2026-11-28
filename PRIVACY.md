@@ -9,9 +9,14 @@ Lowdrift collects nothing.
 - **No permissions.** No microphone, location, contacts, photos, Bluetooth
   scanning, local network or tracking prompts. Audio is played, never recorded.
 - **No purchases.** Free, with no subscriptions or in-app purchases.
-- **On-device settings only.** The last selected sound and each sound's three
-  slider values are stored in the app's own `UserDefaults` on the iPhone. They
-  are never transmitted and are removed when the app is deleted.
+- **On-device settings only.** The last selected sound, each sound's five
+  Customize sound values, which sounds appear on the main screen, and which
+  sounds are favorites are stored in the app's own `UserDefaults` on the
+  iPhone. They are never transmitted and are removed when the app is deleted.
+
+The app shows the same promise in Settings → Privacy Policy, alongside the
+Terms of Service. Both are bundled text (`Lowdrift/Views/LegalDocumentView.swift`),
+so nothing is loaded from the web.
 
 ## App Store privacy disclosure
 

@@ -1,25 +1,43 @@
 import LowdriftCore
 import SwiftUI
 
-/// Lowdrift's one screen: wordmark, waves, the selected sound, Play/Pause, the
-/// sound cards and the Customize sound row.
+/// Lowdrift's one screen: wordmark and Settings, waves, the selected sound,
+/// Play/Pause, the chosen sound cards and the Customize sound row.
 struct MainView: View {
     let controller: PlaybackController
+    let library: SoundLibrary
 
     @State private var isCustomizing = false
+    @State private var isShowingSettings = false
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text("lowdrift")
-                    .font(.system(.title2, design: .default, weight: .semibold))
-                    .tracking(0.4)
-                    .foregroundStyle(Theme.primaryText)
-                    .accessibilityLabel("Lowdrift")
-                    .accessibilityAddTraits(.isHeader)
-                    .padding(.top, 8)
+                HStack(alignment: .center) {
+                    Text("lowdrift")
+                        .font(.system(.title2, design: .default, weight: .semibold))
+                        .tracking(0.4)
+                        .foregroundStyle(Theme.primaryText)
+                        .accessibilityLabel("Lowdrift")
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: 12)
+                    Button {
+                        isShowingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.title3.weight(.medium))
+                            .foregroundStyle(Theme.secondaryText)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressableButtonStyle())
+                    .padding(.trailing, -10)
+                    .accessibilityLabel("Settings")
+                    .accessibilityIdentifier("settings")
+                }
+                .padding(.top, 2)
 
                 WaveDecoration(isAnimating: controller.isPlaying && scenePhase == .active && !reduceMotion)
                     .frame(height: 112)
@@ -61,9 +79,17 @@ struct MainView: View {
                     .padding(.top, 36)
                     .padding(.bottom, 12)
 
-                PresetGrid(selected: controller.selectedPreset) { preset in
-                    controller.select(preset)
-                }
+                PresetGrid(
+                    presets: library.mainScreenPresets,
+                    favorites: library.favorites,
+                    selected: controller.selectedPreset,
+                    select: { controller.select($0) },
+                    toggleFavorite: { preset in
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
+                            library.toggleFavorite(preset)
+                        }
+                    }
+                )
 
                 CustomizeRow(presetName: controller.selectedPreset.name, isCustomized: controller.isCustomized) {
                     isCustomizing = true
@@ -80,6 +106,9 @@ struct MainView: View {
         .animation(.easeInOut(duration: 0.25), value: controller.failure)
         .sheet(isPresented: $isCustomizing) {
             CustomizeSheet(controller: controller)
+        }
+        .sheet(isPresented: $isShowingSettings) {
+            SettingsSheet(library: library)
         }
     }
 }

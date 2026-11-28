@@ -8,6 +8,9 @@ Open it, pick a sound, tap Play, lock the phone.
   Bedroom Fan. Nothing is a recording or a loop. Every sample is
   generated live from a long-period random number generator and shaped with
   lightweight filters.
+- Six sounds on the main screen by default; choose which ones appear in
+  Settings (the gear). Favorites are pinned to the top with a heart, and the
+  rest are sorted A to Z. Long-press a card to favorite it.
 - Five plain-language controls per sound (Depth, Airflow, Hum, Flutter, Drift). They are saved
   on the device, and each sound can be reset on its own.
 - Background playback, Lock Screen and Control Center controls, headphone
@@ -32,9 +35,9 @@ runs on iOS 17 and later, on iPhone.
 
 | What | How | Covers |
 |---|---|---|
-| Sound engine and app logic | `cd LowdriftKit && swift test` (macOS or Linux), or open `LowdriftKit/Package.swift` in Xcode and press ⌘U | Output bounds and non-silence, no clipping/DC/NaN, slider ranges, loudness matching, independence of the controls, Flutter and Drift texture, fades, crossfades, glides, restarts, sustained generation (2 min in Debug, 10 min in Release), no repetition, render cost, persistence, reset, corrupt settings, playback state machine, interruptions, route loss, retry, palette contrast |
+| Sound engine and app logic | `cd LowdriftKit && swift test` (macOS or Linux), or open `LowdriftKit/Package.swift` in Xcode and press ⌘U | Output bounds and non-silence, no clipping/DC/NaN, slider ranges, loudness matching, independence of the controls, Flutter and Drift texture, fades, crossfades, glides, restarts, sustained generation (2 min in Debug, 10 min in Release), no repetition, render cost, persistence, reset, corrupt settings, shown sounds and favorites (defaults, ordering, rules, persistence), playback state machine, interruptions, route loss, retry, palette contrast |
 | AVAudioEngine integration | `swift test` on macOS, or the LowdriftKit package in Xcode on an iPhone simulator | The real `AVAudioSourceNode` render block inside a real `AVAudioEngine` (offline manual rendering): stereo and mono outputs, the same signal on every channel, unity gain through the mixer |
-| App UI | ⌘U in `Lowdrift.xcodeproj` (the Lowdrift scheme runs LowdriftUITests) | Fresh install opens on Basement AC, paused; all sound cards; selecting while paused stays paused; exactly five sliders; edits survive relaunch; Reset affects only that sound |
+| App UI | ⌘U in `Lowdrift.xcodeproj` (the Lowdrift scheme runs LowdriftUITests) | Fresh install opens on Basement AC, paused, with the six default cards A to Z; Settings shows and hides sounds and favorites pin to the top (also by long-press), surviving relaunch; Terms of Service and Privacy Policy open; selecting while paused stays paused; exactly five sliders; edits survive relaunch; Reset affects only that sound |
 | Eight-hour render | `cd LowdriftKit && LOWDRIFT_OVERNIGHT_TEST=1 swift test -c release --filter testOvernightRenderStaysClean` | Eight simulated hours rendered offline: no NaN, peak below the limiter ceiling, minute-to-minute level steady |
 | Privacy | `./scripts/privacy-audit.sh` | No network, tracking, recording, purchase or logging APIs in shipped code, no permission keys, empty privacy manifest |
 | Personal info | `./scripts/personal-info-check.sh` | The owner's personal information (stored only as hashes) is absent from files, commit messages, commit authors and branch names; commits use noreply emails; no home-directory paths |
@@ -94,7 +97,7 @@ acceptance checks until someone actually runs them on a device:
 ## How it is built
 
 ```
-Lowdrift/                 SwiftUI app: one screen, the Customize sheet, App Intents
+Lowdrift/                 SwiftUI app: one screen, the Customize and Settings sheets, App Intents
   App/                    App entry and the shared environment
   Views/                  Main screen, cards, sheet, waves, theme
   Intents/                Play, Pause, Play a sound; Siri phrases

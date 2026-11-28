@@ -15,17 +15,23 @@ It is not a DAW. Read the README for the layout and how to test.
   "Requested by" line. `scripts/personal-info-check.sh` must keep passing.
 - Swift and SwiftUI with Apple frameworks only; no third-party packages in the
   app.
-- One main screen and one native Customize sheet:
-  - The lowercase “lowdrift” wordmark sits at the upper left, with no gear,
-    tabs, onboarding, settings or sleep timer.
+- One main screen with two native sheets, Customize sound and Settings:
+  - The lowercase “lowdrift” wordmark sits at the upper left and a gear at
+    the upper right opens Settings. No tabs, onboarding or sleep timer.
+  - Settings holds only: which sounds appear on the main screen, favorites,
+    and the on-device Terms of Service and Privacy Policy (no web links).
   - The Customize sound row has no chevron.
   - Loudness comes from the hardware volume buttons; there is no in-app volume
     slider.
 - Launch selects the last-used sound (Basement AC on first launch) and stays
   paused. Never start audio the user didn't ask for.
-- The ten sounds keep their names, subtitles and order: Soft Fan, Box Fan,
+- The ten sounds keep their names and subtitles: Soft Fan, Box Fan,
   Basement AC, Tower Fan, Deep Drift, Ceiling Fan, Window AC,
   Cabin Air, Desk Fan, Bedroom Fan.
+- The main screen shows six sounds by default (Soft Fan, Box Fan, Basement AC,
+  Tower Fan, Deep Drift, Bedroom Fan). Favorites are pinned to the top with a
+  teal heart; the rest are sorted A to Z. A favorite is always shown, and at
+  least one sound always stays on the main screen.
 
 ## Sound
 

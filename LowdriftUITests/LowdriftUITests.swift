@@ -3,8 +3,9 @@ import XCTest
 /// Acceptance checks for the one-screen experience. These launch the app with a
 /// private settings domain and never press Play, so they need no audio hardware.
 final class LowdriftUITests: XCTestCase {
-    private let presets = ["softFan", "boxFan", "basementAC", "towerFan", "deepDrift",
-                                   "ceilingFan", "windowAC", "cabinAir", "deskFan", "bedroomFan"]
+    /// The six cards on a fresh install, A to Z.
+    private let defaultVisible = ["basementAC", "bedroomFan", "boxFan", "deepDrift", "softFan", "towerFan"]
+    private let defaultHidden = ["ceilingFan", "windowAC", "cabinAir", "deskFan"]
 
     override func setUp() {
         continueAfterFailure = false
@@ -28,9 +29,18 @@ final class LowdriftUITests: XCTestCase {
         XCTAssertEqual(app.buttons["playPause"].label, "Play", "Opening the app never starts playback")
         XCTAssertTrue(selectedSound(app).label.contains("Basement AC"))
         XCTAssertTrue(selectedSound(app).label.contains("Deep and enveloping."))
-        for preset in presets {
+        for preset in defaultVisible {
             XCTAssertTrue(app.buttons["preset.\(preset)"].exists, "Missing card \(preset)")
         }
+        for preset in defaultHidden {
+            XCTAssertFalse(app.buttons["preset.\(preset)"].exists, "\(preset) is hidden until chosen in Settings")
+        }
+        // A to Z with no favorites: Basement AC top left, Bedroom Fan beside it.
+        let first = app.buttons["preset.basementAC"].frame
+        let second = app.buttons["preset.bedroomFan"].frame
+        XCTAssertEqual(first.minY, second.minY, accuracy: 1)
+        XCTAssertLessThan(first.minX, second.minX)
+        XCTAssertTrue(app.buttons["settings"].exists)
         XCTAssertTrue(app.buttons["preset.basementAC"].isSelected)
         XCTAssertFalse(app.buttons["preset.softFan"].isSelected)
         XCTAssertTrue(app.buttons["customize"].exists)
@@ -84,5 +94,97 @@ final class LowdriftUITests: XCTestCase {
         app.buttons["preset.softFan"].tap()
         app.buttons["customize"].tap()
         XCTAssertFalse(app.buttons["reset"].waitForExistence(timeout: 5) && app.buttons["reset"].isEnabled)
+    }
+
+    // MARK: - Settings and favorites
+
+    private func openSettings(_ app: XCUIApplication) {
+        app.buttons["settings"].tap()
+        XCTAssertTrue(app.buttons["closeSettings"].waitForExistence(timeout: 5))
+    }
+
+    /// Flips a Settings switch. On recent iOS the row's own center is the label,
+    /// so tap the switch itself.
+    private func flip(_ toggle: XCUIElement) {
+        let inner = toggle.switches.firstMatch
+        if inner.exists {
+            inner.tap()
+        } else {
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        }
+    }
+
+    private func isOn(_ toggle: XCUIElement) -> Bool {
+        (toggle.value as? String) == "1"
+    }
+
+    func testSettingsChoosesSoundsAndFavoritesPinToTop() {
+        var app = launch(resetSettings: true)
+        openSettings(app)
+
+        let showCabinAir = app.switches["show.cabinAir"]
+        XCTAssertTrue(showCabinAir.waitForExistence(timeout: 5))
+        XCTAssertFalse(isOn(showCabinAir))
+        XCTAssertTrue(isOn(app.switches["show.bedroomFan"]), "Bedroom Fan is shown by default")
+        flip(showCabinAir)
+        XCTAssertTrue(isOn(showCabinAir))
+
+        // Favoriting a hidden sound also shows it.
+        app.buttons["favorite.ceilingFan"].tap()
+        XCTAssertTrue(isOn(app.switches["show.ceilingFan"]))
+
+        flip(app.switches["show.softFan"])
+        XCTAssertFalse(isOn(app.switches["show.softFan"]))
+        app.buttons["closeSettings"].tap()
+
+        XCTAssertTrue(app.buttons["preset.cabinAir"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["preset.softFan"].exists)
+        assertPinnedFirst(app, favorite: "ceilingFan", next: "basementAC", below: "bedroomFan")
+
+        // Everything is still there after a relaunch.
+        app.terminate()
+        app = launch(resetSettings: false)
+        XCTAssertTrue(app.buttons["preset.cabinAir"].exists)
+        XCTAssertFalse(app.buttons["preset.softFan"].exists)
+        assertPinnedFirst(app, favorite: "ceilingFan", next: "basementAC", below: "bedroomFan")
+    }
+
+    func testLongPressFavoritesACard() {
+        let app = launch(resetSettings: true)
+        let tower = app.buttons["preset.towerFan"]
+        tower.press(forDuration: 1.2)
+        let add = app.buttons["Add to Favorites"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.tap()
+        XCTAssertTrue(app.buttons["preset.towerFan"].waitForExistence(timeout: 5))
+        assertPinnedFirst(app, favorite: "towerFan", next: "basementAC", below: "bedroomFan")
+        XCTAssertEqual(app.buttons["playPause"].label, "Play", "Favoriting never starts playback")
+    }
+
+    func testTermsAndPrivacyPolicyOpenFromSettings() {
+        let app = launch(resetSettings: true)
+        openSettings(app)
+
+        app.buttons["termsOfService"].tap()
+        XCTAssertTrue(app.navigationBars["Terms of Service"].waitForExistence(timeout: 5))
+        app.navigationBars["Terms of Service"].buttons.firstMatch.tap()
+
+        XCTAssertTrue(app.buttons["privacyPolicy"].waitForExistence(timeout: 5))
+        app.buttons["privacyPolicy"].tap()
+        XCTAssertTrue(app.navigationBars["Privacy Policy"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["No network access"].exists)
+    }
+
+    /// The favorite's card is top left with a heart, `next` beside it, and `below` on the next row.
+    private func assertPinnedFirst(_ app: XCUIApplication, favorite: String, next: String, below: String,
+                                   file: StaticString = #filePath, line: UInt = #line) {
+        let card = app.buttons["preset.\(favorite)"]
+        XCTAssertTrue((card.value as? String)?.hasPrefix("Favorite") ?? false, "Heart shown", file: file, line: line)
+        let first = card.frame
+        let second = app.buttons["preset.\(next)"].frame
+        let third = app.buttons["preset.\(below)"].frame
+        XCTAssertEqual(first.minY, second.minY, accuracy: 1, file: file, line: line)
+        XCTAssertLessThan(first.minX, second.minX, file: file, line: line)
+        XCTAssertGreaterThan(third.minY, first.minY + 10, file: file, line: line)
     }
 }

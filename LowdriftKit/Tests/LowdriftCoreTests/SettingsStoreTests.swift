@@ -127,3 +127,25 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(controls.depth, 30, "A non-finite edit keeps the previous value")
     }
 }
+
+final class SoundListSettingsTests: XCTestCase {
+    func testDefaultsAreSixShownAndNoFavorites() {
+        let store = SettingsStore(storage: InMemoryStorage())
+        XCTAssertEqual(store.visiblePresets, Preset.defaultVisible)
+        XCTAssertEqual(store.visiblePresets.count, 6)
+        XCTAssertTrue(store.visiblePresets.contains(.bedroomFan))
+        XCTAssertEqual(store.favoritePresets, [])
+    }
+
+    func testShownAndFavoritesRoundTripAsSoundNames() {
+        let storage = InMemoryStorage()
+        let store = SettingsStore(storage: storage)
+        store.visiblePresets = [.windowAC, .bedroomFan]
+        store.favoritePresets = [.windowAC]
+        XCTAssertEqual(storage.values[SettingsStore.Key.visiblePresets] as? [String], ["windowAC", "bedroomFan"])
+
+        let reopened = SettingsStore(storage: storage)
+        XCTAssertEqual(reopened.visiblePresets, [.windowAC, .bedroomFan])
+        XCTAssertEqual(reopened.favoritePresets, [.windowAC])
+    }
+}
