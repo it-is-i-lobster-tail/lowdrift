@@ -8,7 +8,6 @@ struct CustomizeSheet: View {
     @Bindable var controller: PlaybackController
 
     @Environment(\.dismiss) private var dismiss
-    @ScaledMetric(relativeTo: .body) private var compactHeight: CGFloat = 640
 
     var body: some View {
         NavigationStack {
@@ -85,7 +84,8 @@ struct CustomizeSheet: View {
             }
         }
         .tint(Theme.accent)
-        .presentationDetents([.height(compactHeight), .large])
+        // Opens full height so all five controls and Reset to default are in view.
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
 }
