@@ -13,18 +13,16 @@ struct Voice {
     private var controlNoise: NoiseSource
 
     private var pink = PinkingFilter()
-    private var airHighpass = StateVariableFilter()
-    private var whooshBand = StateVariableFilter()
-    private var presenceBand = StateVariableFilter()
-    private var presenceOpenBand = StateVariableFilter()
-    private var lowpass1 = StateVariableFilter()
+    // The voice's filters, grouped into stages that run side by side:
+    //   stage 1: air high-pass       | rumble low-pass 1  | whirr band 1 | —
+    //   stage 2: whoosh band         | rumble low-pass 2  | whirr band 2 | presence band
+    //   stage 3: air low-pass 1      | rumble high-pass   | presence-open band | —
+    // followed by the scalar air low-pass 2.
+    private var stage1 = FilterBank4()
+    private var stage2 = FilterBank4()
+    private var stage3 = FilterBank4()
     private var lowpass2 = StateVariableFilter()
-    private var rumbleLowpass1 = StateVariableFilter()
-    private var rumbleLowpass2 = StateVariableFilter()
-    private var rumbleHighpass = StateVariableFilter()
-    private var humNoiseBand = StateVariableFilter()
-    private var humNoiseBand2 = StateVariableFilter()
-    private var humOscillator = QuadratureOscillator()
+    private var humOscillator = HarmonicOscillator()
     private var bladeOscillator = QuadratureOscillator()
 
     // Slow, independent, non-periodic drifts (tens of seconds) and a faster
@@ -34,13 +32,8 @@ struct Voice {
     private var driftC = SlowDrift()
     private var flutter = SlowDrift()
 
-    private var whooshGain = Ramp()
-    private var presenceGain = Ramp()
-    private var presenceOpenGain = Ramp()
-    private var airLevel = Ramp()
-    private var rumbleLevel = Ramp()
-    private var bladeDepth = Ramp()
-    private var humNoiseLevel = Ramp()
+    /// Per-sample gains, ramped together; lanes named in `Gain`.
+    private var gains = RampBank()
     private var humAmplitudes = SIMD8<Float>.zero
     private var humStep = SIMD8<Float>.zero
     private var humActive = false
@@ -66,20 +59,17 @@ struct Voice {
         target = targets
         current = targets
         pink.reset()
-        airHighpass.reset(); whooshBand.reset(); presenceBand.reset(); presenceOpenBand.reset()
-        lowpass1.reset(); lowpass2.reset()
-        rumbleLowpass1.reset(); rumbleLowpass2.reset(); rumbleHighpass.reset()
-        humNoiseBand.reset()
-        humNoiseBand2.reset()
+        stage1.reset(); stage2.reset(); stage3.reset()
+        lowpass2.reset()
         humOscillator.reset()
         bladeOscillator.reset()
-        whooshGain.snap(to: targets.whooshGain)
-        presenceGain.snap(to: targets.presenceGain * (1 - targets.presenceOpen))
-        presenceOpenGain.snap(to: targets.presenceGain * targets.presenceOpen)
-        airLevel.snap(to: targets.airLevel)
-        rumbleLevel.snap(to: targets.rumbleLevel)
-        bladeDepth.snap(to: targets.bladeDepth)
-        humNoiseLevel.snap(to: targets.humNoiseLevel)
+        gains.snap(Gain.whoosh, to: targets.whooshGain)
+        gains.snap(Gain.presence, to: targets.presenceGain * (1 - targets.presenceOpen))
+        gains.snap(Gain.presenceOpen, to: targets.presenceGain * targets.presenceOpen)
+        gains.snap(Gain.air, to: targets.airLevel)
+        gains.snap(Gain.rumble, to: targets.rumbleLevel)
+        gains.snap(Gain.blade, to: targets.bladeDepth)
+        gains.snap(Gain.whirr, to: targets.humNoiseLevel)
         humAmplitudes = targets.humAmplitudes
         humStep = .zero
     }
@@ -94,93 +84,92 @@ struct Voice {
         let c = driftC.nextBounded(controlNoise.nextBipolar())
         let turbulence = min(max(flutter.nextGaussian(controlNoise.nextBipolar()), -2.5), 2.5)
 
-        airHighpass.setCoefficients(g: warpedCoefficient(hz: exp2(current.airHighpass), sampleRate: fs),
-                                    q: VoiceModel.airHighpassQ)
-        lowpass1.setCoefficients(g: warpedCoefficient(hz: exp2(current.lowpass1 + 0.07 * a), sampleRate: fs),
-                                 q: current.lowpassQ)
+        stage1.setLane(0, g: warpedCoefficient(hz: exp2(current.airHighpass), sampleRate: fs),
+                       q: VoiceModel.airHighpassQ, response: .highpass)
+        stage3.setLane(0, g: warpedCoefficient(hz: exp2(current.lowpass1 + 0.07 * a), sampleRate: fs),
+                       q: current.lowpassQ, response: .lowpass)
         lowpass2.setCoefficients(g: warpedCoefficient(hz: exp2(current.lowpass2 + 0.07 * a), sampleRate: fs),
                                  q: current.lowpassQ)
-        whooshBand.setCoefficients(g: warpedCoefficient(hz: exp2(current.whoosh + 0.05 * b), sampleRate: fs),
-                                   q: current.whooshQ)
+        stage2.setLane(0, g: warpedCoefficient(hz: exp2(current.whoosh + 0.05 * b), sampleRate: fs),
+                       q: current.whooshQ, response: .bandpass)
         let presenceG = warpedCoefficient(hz: exp2(current.presence), sampleRate: fs)
-        presenceBand.setCoefficients(g: presenceG, q: current.presenceQ)
-        presenceOpenBand.setCoefficients(g: presenceG, q: current.presenceQ)
+        stage2.setLane(3, g: presenceG, q: current.presenceQ, response: .bandpass)
+        stage3.setLane(2, g: presenceG, q: current.presenceQ, response: .bandpass)
         let rumbleG = warpedCoefficient(hz: exp2(current.rumble), sampleRate: fs)
-        rumbleLowpass1.setCoefficients(g: rumbleG, q: 1 / VoiceModel.rumbleK)
-        rumbleLowpass2.setCoefficients(g: rumbleG, q: 1 / VoiceModel.rumbleK)
-        rumbleHighpass.setCoefficients(g: warpedCoefficient(hz: VoiceModel.rumbleHighpassHz, sampleRate: fs),
-                                       q: 1 / VoiceModel.rumbleK)
+        stage1.setLane(1, g: rumbleG, q: 1 / VoiceModel.rumbleK, response: .lowpass)
+        stage2.setLane(1, g: rumbleG, q: 1 / VoiceModel.rumbleK, response: .lowpass)
+        stage3.setLane(1, g: warpedCoefficient(hz: VoiceModel.rumbleHighpassHz, sampleRate: fs),
+                       q: 1 / VoiceModel.rumbleK, response: .highpass)
 
         bladeOscillator.setFrequency(exp2(current.blade) * (1 + 0.01 * b), sampleRate: fs)
         bladeOscillator.renormalize()
 
         let flutterGain = 1 + current.turbulence * turbulence
-        whooshGain.ramp(to: current.whooshGain * flutterGain, frames: frames)
-        presenceGain.ramp(to: current.presenceGain * (1 - current.presenceOpen) * flutterGain, frames: frames)
-        presenceOpenGain.ramp(to: current.presenceGain * current.presenceOpen * flutterGain, frames: frames)
-        airLevel.ramp(to: current.airLevel * (1 + 0.035 * b), frames: frames)
-        rumbleLevel.ramp(to: current.rumbleLevel * (1 + 0.08 * a), frames: frames)
-        bladeDepth.ramp(to: current.bladeDepth, frames: frames)
+        gains.ramp(Gain.whoosh, to: current.whooshGain * flutterGain, frames: frames)
+        gains.ramp(Gain.presence, to: current.presenceGain * (1 - current.presenceOpen) * flutterGain, frames: frames)
+        gains.ramp(Gain.presenceOpen, to: current.presenceGain * current.presenceOpen * flutterGain, frames: frames)
+        gains.ramp(Gain.air, to: current.airLevel * (1 + 0.035 * b), frames: frames)
+        gains.ramp(Gain.rumble, to: current.rumbleLevel * (1 + 0.08 * a), frames: frames)
+        gains.ramp(Gain.blade, to: current.bladeDepth, frames: frames)
 
         let humTarget = current.humAmplitudes * (1 + 0.06 * c)
         humStep = (humTarget - humAmplitudes) / Float(frames)
         humActive = (humTarget + humAmplitudes).max() > 1e-7
         if humActive {
             humOscillator.setFrequency(exp2(current.humFundamental) * (1 + 0.0015 * c), sampleRate: fs)
-            humOscillator.renormalize()
+            humOscillator.resynchronize()
             let whirrG = warpedCoefficient(hz: exp2(current.humNoise) * (1 + 0.0015 * c), sampleRate: fs)
-            humNoiseBand.setCoefficients(g: whirrG, q: current.humNoiseQ)
-            humNoiseBand2.setCoefficients(g: whirrG, q: current.humNoiseQ)
+            stage1.setLane(2, g: whirrG, q: current.humNoiseQ, response: .bandpass)
+            stage2.setLane(2, g: whirrG, q: current.humNoiseQ, response: .bandpass)
         }
-        humNoiseLevel.ramp(to: current.humNoiseLevel, frames: frames)
+        gains.ramp(Gain.whirr, to: current.humNoiseLevel, frames: frames)
     }
 
     /// Generates one sample. Called `frames` times after `beginBlock`.
     @inline(__always)
     mutating func renderSample() -> Float {
         // Airflow: pink-ish noise, high-passed, with two resonant bands, low-passed.
-        let shaped = airHighpass.highpass(pink.process(noise.nextBipolar()))
-        let body = whooshBand.bandpass(shaped)
-        let presence = presenceBand.bandpass(shaped)
-        var air = lowpass2.lowpass(lowpass1.lowpass(shaped + whooshGain.value * body + presenceGain.value * presence))
-            + presenceOpenGain.value * presenceOpenBand.bandpass(presence)
-        bladeOscillator.advance()
-        air *= 1 + bladeDepth.value * bladeOscillator.sine
-
         // Low body: independent noise, low-passed to a bounded rumble.
-        let rumble = rumbleHighpass.highpass(rumbleLowpass2.lowpass(rumbleLowpass1.lowpass(noise.nextBipolar())))
+        // Motor whirr: a third noise through two cascaded band-passes, which keep
+        // its skirts from leaking upward. (Noise is drawn in this order every
+        // sample; the whirr's only while the motor is audible.)
+        let g = gains.values
+        let pinked = pink.process(noise.nextBipolar())
+        let rumbleNoise = noise.nextBipolar()
+        let whirrNoise = humActive ? noise.nextBipolar() : 0
+        let s1 = stage1.process(SIMD4(pinked, rumbleNoise, whirrNoise, 0))
+        let shaped = s1[0]
+        let s2 = stage2.process(SIMD4(shaped, s1[1], s1[2], shaped))
+        let presence = s2[3]
+        let s3 = stage3.process(SIMD4(shaped + g[Gain.whoosh] * s2[0] + g[Gain.presence] * presence,
+                                      s2[1], presence, 0))
+        var air = lowpass2.lowpass(s3[0]) + g[Gain.presenceOpen] * s3[2]
+        bladeOscillator.advance()
+        air *= 1 + g[Gain.blade] * bladeOscillator.sine
 
-        var y = air * airLevel.value + rumble * rumbleLevel.value
+        var y = air * g[Gain.air] + s3[1] * g[Gain.rumble]
 
         if humActive {
-            // Motor: phase-locked harmonics from one oscillator (angle-addition
-            // recursion, no trig per sample), plus a narrow whirr.
+            // Motor: eight phase-locked harmonics (one vector rotation, no trig
+            // per sample), plus the whirr.
             humOscillator.advance()
-            let s1 = humOscillator.sine
-            let c1 = humOscillator.cosine
-            var partials = SIMD8<Float>.zero
-            var sk = s1
-            var ck = c1
-            partials[0] = s1
-            for k in 1..<8 {
-                let s = sk * c1 + ck * s1
-                ck = ck * c1 - sk * s1
-                sk = s
-                partials[k] = s
-            }
-            y += (humAmplitudes * partials).sum()
-            // Two cascaded band-passes keep the whirr's skirts from leaking upward.
-            y += humNoiseBand2.bandpass(humNoiseBand.bandpass(noise.nextBipolar())) * humNoiseLevel.value
+            y += (humAmplitudes * humOscillator.sine).sum()
+            y += s2[2] * g[Gain.whirr]
             humAmplitudes += humStep
         }
-
-        whooshGain.tick()
-        presenceGain.tick()
-        presenceOpenGain.tick()
-        airLevel.tick()
-        rumbleLevel.tick()
-        bladeDepth.tick()
-        humNoiseLevel.tick()
+        gains.tick()
         return y
     }
+}
+
+/// Lanes of the voice's gain bank. (Computed constants, so the render thread
+/// never touches lazily initialised globals.)
+private enum Gain {
+    static var whoosh: Int { 0 }
+    static var presence: Int { 1 }
+    static var presenceOpen: Int { 2 }
+    static var air: Int { 3 }
+    static var rumble: Int { 4 }
+    static var blade: Int { 5 }
+    static var whirr: Int { 6 }
 }

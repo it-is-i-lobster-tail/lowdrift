@@ -19,22 +19,24 @@ struct StateVariableFilter: Sendable {
     private var ic2: Float = 0
     private var a1: Float = 1
     private var a2: Float = 0
-    private var a3: Float = 0
+    private var g: Float = 0
     private(set) var k: Float = 1.414_213_6
 
     mutating func setCoefficients(g: Float, q: Float) {
         let damping = 1 / min(max(q, 0.2), 20)
         k = damping
+        self.g = g
         a1 = 1 / (1 + g * (g + damping))
         a2 = g * a1
-        a3 = g * a2
     }
 
     @inline(__always)
     private mutating func tick(_ x: Float) -> (low: Float, band: Float) {
         let v3 = x - ic2
         let v1 = a1 * ic1 + a2 * v3
-        let v2 = ic2 + a2 * ic1 + a3 * v3
+        // Simper's v2 = ic2 + a2·ic1 + a3·v3 with a3 = g·a2 is exactly ic2 + g·v1:
+        // one multiply, one add and one coefficient fewer per sample.
+        let v2 = ic2 + g * v1
         ic1 = 2 * v1 - ic1
         ic2 = 2 * v2 - ic2
         return (v2, v1)
@@ -56,6 +58,59 @@ struct StateVariableFilter: Sendable {
     mutating func reset() {
         ic1 = 0
         ic2 = 0
+    }
+}
+
+/// Four independent state-variable filters (the same trapezoidal design as
+/// `StateVariableFilter`) advanced together in one SIMD step per sample.
+///
+/// The voice's filters form a few parallel stages (air, rumble and motor
+/// whirr run side by side), so each stage costs one vector update instead of
+/// several scalar ones. Each lane has its own cutoff, Q and response; the output
+/// of lane i is that lane's low-pass, unity-peak band-pass or high-pass.
+struct FilterBank4: Sendable {
+    enum Response { case lowpass, bandpass, highpass }
+
+    private var ic1 = SIMD4<Float>.zero
+    private var ic2 = SIMD4<Float>.zero
+    private var a1 = SIMD4<Float>(repeating: 1)
+    private var a2 = SIMD4<Float>.zero
+    private var g = SIMD4<Float>.zero
+    // Output mix: y = mixInput·x + mixBand·band + mixLow·low.
+    private var mixInput = SIMD4<Float>.zero
+    private var mixBand = SIMD4<Float>.zero
+    private var mixLow = SIMD4<Float>.zero
+
+    /// Sets one lane's coefficients. Unset lanes output silence.
+    mutating func setLane(_ lane: Int, g gain: Float, q: Float, response: Response) {
+        let damping = 1 / min(max(q, 0.2), 20)
+        let laneA1 = 1 / (1 + gain * (gain + damping))
+        g[lane] = gain
+        a1[lane] = laneA1
+        a2[lane] = gain * laneA1
+        switch response {
+        case .lowpass:
+            mixInput[lane] = 0; mixBand[lane] = 0; mixLow[lane] = 1
+        case .bandpass:
+            mixInput[lane] = 0; mixBand[lane] = damping; mixLow[lane] = 0
+        case .highpass:
+            mixInput[lane] = 1; mixBand[lane] = -damping; mixLow[lane] = -1
+        }
+    }
+
+    @inline(__always)
+    mutating func process(_ x: SIMD4<Float>) -> SIMD4<Float> {
+        let v3 = x - ic2
+        let v1 = a1 * ic1 + a2 * v3
+        let v2 = ic2 + g * v1
+        ic1 = 2 * v1 - ic1
+        ic2 = 2 * v2 - ic2
+        return mixInput * x + mixBand * v1 + mixLow * v2
+    }
+
+    mutating func reset() {
+        ic1 = .zero
+        ic2 = .zero
     }
 }
 
@@ -154,6 +209,63 @@ struct QuadratureOscillator: Sendable {
     }
 }
 
+/// The first eight harmonics of one fundamental, as eight sine/cosine pairs that
+/// each advance by complex rotation in one SIMD step per sample.
+///
+/// The harmonics are rebuilt from the fundamental (lane 0) at every control block
+/// with the angle-addition recursion, so they stay exactly phase-locked over an
+/// eight-hour session, while the per-sample work is a few vector multiplies
+/// instead of a serial recursion through all eight partials.
+struct HarmonicOscillator: Sendable {
+    private(set) var sine = SIMD8<Float>.zero
+    private(set) var cosine = SIMD8<Float>(repeating: 1)
+    private var rotationSin = SIMD8<Float>.zero
+    private var rotationCos = SIMD8<Float>(repeating: 1)
+
+    /// Sets the fundamental; harmonic k rotates k times as fast.
+    mutating func setFrequency(_ hz: Float, sampleRate: Float) {
+        let w = 2 * Float.pi * min(max(hz, 0), sampleRate * 0.45) / sampleRate
+        (rotationSin, rotationCos) = Self.harmonics(sine: sin(w), cosine: cos(w))
+    }
+
+    /// Renormalises the fundamental and re-derives the harmonics from it.
+    mutating func resynchronize() {
+        let c = cosine[0], s = sine[0]
+        let m = 1.5 - 0.5 * (c * c + s * s)
+        (sine, cosine) = Self.harmonics(sine: s * m, cosine: c * m)
+    }
+
+    @inline(__always)
+    mutating func advance() {
+        let s = sine * rotationCos + cosine * rotationSin
+        cosine = cosine * rotationCos - sine * rotationSin
+        sine = s
+    }
+
+    mutating func reset() {
+        sine = .zero
+        cosine = SIMD8(repeating: 1)
+    }
+
+    /// sin(kθ), cos(kθ) for k = 1…8 from sin θ and cos θ.
+    private static func harmonics(sine s1: Float, cosine c1: Float) -> (SIMD8<Float>, SIMD8<Float>) {
+        var sines = SIMD8<Float>.zero
+        var cosines = SIMD8<Float>.zero
+        var sk = s1
+        var ck = c1
+        sines[0] = s1
+        cosines[0] = c1
+        for k in 1 ..< 8 {
+            let s = sk * c1 + ck * s1
+            ck = ck * c1 - sk * s1
+            sk = s
+            sines[k] = s
+            cosines[k] = ck
+        }
+        return (sines, cosines)
+    }
+}
+
 /// Very slow, smooth, non-periodic wandering in [-1, 1]: white noise through two
 /// cascaded one-pole low-passes, normalised and softly bounded. Runs at control
 /// rate, so its cost is negligible.
@@ -211,6 +323,26 @@ struct Ramp: Sendable {
     mutating func tick() { value += step }
 
     var isIdleAtZero: Bool { value == 0 && step == 0 }
+}
+
+/// Up to eight `Ramp`s advanced together: one vector add per sample instead of
+/// one scalar add per ramp. Lanes are addressed by index.
+struct RampBank: Sendable {
+    private(set) var values = SIMD8<Float>.zero
+    private var steps = SIMD8<Float>.zero
+
+    @inline(__always)
+    mutating func ramp(_ lane: Int, to target: Float, frames: Int) {
+        steps[lane] = (target - values[lane]) / Float(frames)
+    }
+
+    mutating func snap(_ lane: Int, to target: Float) {
+        values[lane] = target
+        steps[lane] = 0
+    }
+
+    @inline(__always)
+    mutating func tick() { values += steps }
 }
 
 /// Gentle rational soft-knee limiter: transparent below `threshold`, approaches
