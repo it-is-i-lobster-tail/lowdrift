@@ -9,12 +9,15 @@ struct SettingsSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    /// Closes the whole sheet from any page (a pushed page's own `dismiss` would only go back).
+    private func close() { dismiss() }
+
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     NavigationLink {
-                        SoundsSettingsView(library: library)
+                        SoundsSettingsView(library: library, close: close)
                     } label: {
                         SettingsRowLabel(title: "Sounds", systemImage: "fan") {
                             Text("\(library.visible.count) shown")
@@ -25,7 +28,7 @@ struct SettingsSheet: View {
 
                 Section {
                     NavigationLink {
-                        LegalSettingsView()
+                        LegalSettingsView(close: close)
                     } label: {
                         SettingsRowLabel(title: "Legal", systemImage: "doc.text")
                     }
@@ -38,18 +41,7 @@ struct SettingsSheet: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.body.weight(.semibold))
-                    }
-                    .accessibilityLabel("Close")
-                    .accessibilityIdentifier("closeSettings")
-                }
-            }
+            .closesSettings(close)
         }
         .tint(Theme.accent)
         .presentationDragIndicator(.visible)
@@ -103,6 +95,7 @@ extension SettingsRowLabel where Value == EmptyView {
 /// pin it to the top.
 private struct SoundsSettingsView: View {
     let library: SoundLibrary
+    let close: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -129,6 +122,7 @@ private struct SoundsSettingsView: View {
         }
         .navigationTitle("Sounds")
         .navigationBarTitleDisplayMode(.inline)
+        .closesSettings(close)
     }
 
     private func change(_ body: () -> Void) {
@@ -138,18 +132,20 @@ private struct SoundsSettingsView: View {
 
 /// Terms of Service and Privacy Policy, both bundled with the app.
 private struct LegalSettingsView: View {
+    let close: () -> Void
+
     var body: some View {
         Form {
             Section {
                 NavigationLink {
-                    LegalDocumentView(document: .termsOfService)
+                    LegalDocumentView(document: .termsOfService, close: close)
                 } label: {
                     SettingsRowLabel(title: "Terms of Service", systemImage: "doc.plaintext")
                 }
                 .accessibilityIdentifier("termsOfService")
 
                 NavigationLink {
-                    LegalDocumentView(document: .privacyPolicy)
+                    LegalDocumentView(document: .privacyPolicy, close: close)
                 } label: {
                     SettingsRowLabel(title: "Privacy Policy", systemImage: "hand.raised")
                 }
@@ -160,6 +156,7 @@ private struct LegalSettingsView: View {
         }
         .navigationTitle("Legal")
         .navigationBarTitleDisplayMode(.inline)
+        .closesSettings(close)
     }
 }
 
@@ -202,6 +199,22 @@ private struct SoundRow: View {
             .accessibilityLabel("Show \(preset.name) on main screen")
             .accessibilityHint(isVisible && !canHide ? "At least one sound stays on the main screen." : "")
             .accessibilityIdentifier("show.\(preset.rawValue)")
+        }
+    }
+}
+
+extension View {
+    /// The Close button at the top right of every Settings page.
+    func closesSettings(_ close: @escaping () -> Void) -> some View {
+        toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(action: close) {
+                    Image(systemName: "xmark")
+                        .font(.body.weight(.semibold))
+                }
+                .accessibilityLabel("Close")
+                .accessibilityIdentifier("closeSettings")
+            }
         }
     }
 }

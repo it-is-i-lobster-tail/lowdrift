@@ -4,6 +4,7 @@ import SwiftUI
 /// it reads the same offline and nothing is fetched.
 struct LegalDocumentView: View {
     let document: LegalDocument
+    let close: () -> Void
 
     var body: some View {
         ScrollView {
@@ -32,6 +33,7 @@ struct LegalDocumentView: View {
         }
         .navigationTitle(document.title)
         .navigationBarTitleDisplayMode(.inline)
+        .closesSettings(close)
         .accessibilityIdentifier("legal.\(document.id)")
     }
 }
