@@ -4,6 +4,7 @@
 //   swift run -c release lowdrift-render                # all presets, 30 s each
 //   swift run -c release lowdrift-render basementAC --seconds 120 --depth 90
 //   swift run -c release lowdrift-render all --out ~/Desktop/lowdrift-previews
+//   swift run -c release lowdrift-render --bench          # render cost per preset
 
 import Foundation
 import LowdriftAnalysis
@@ -43,7 +44,7 @@ func parse(_ arguments: [String]) -> Options {
         case "--no-files": options.writeFiles = false
         case "--matrix": options.matrix = true
         case "--speaker": options.compactSpeaker = true
-        case "--predict": break
+        case "--predict", "--bench": break
         case "all": options.presets = Preset.allCases
         default:
             if let preset = Preset(rawValue: argument) {
@@ -63,6 +64,50 @@ if options.writeFiles {
 }
 
 func format(_ value: Double, _ digits: Int = 1) -> String { String(format: "%.\(digits)f", value) }
+
+if CommandLine.arguments.contains("--bench") {
+    // Render cost in steady playback, in hardware-sized slices (4,096 frames is
+    // what iOS uses with the screen locked). Reports nanoseconds per output
+    // sample and how many times faster than real time this machine renders.
+    let slice = 4_096
+    let seconds = CommandLine.arguments.contains("--seconds") ? options.seconds : 120
+    var buffer = [Float](repeating: 0, count: slice)
+    print("preset         ns/sample   × real time")
+    var totalNs = 0.0
+    for preset in options.presets {
+        let defaults = preset.defaultControls
+        let renderer = NoiseRenderer(sampleRate: options.sampleRate, seed: 0x10D2_1F7)
+        renderer.setCompactSpeaker(options.compactSpeaker)
+        renderer.setSound(preset.soundProfile, depth: (options.depth ?? defaults.depth) / 100,
+                          airflow: (options.airflow ?? defaults.airflow) / 100, hum: (options.hum ?? defaults.hum) / 100,
+                          flutter: (options.flutter ?? defaults.flutter) / 100, drift: (options.drift ?? defaults.drift) / 100)
+        renderer.fadeIn()
+        let frames = Int(seconds * options.sampleRate)
+        func run(_ count: Int) {
+            var remaining = count
+            buffer.withUnsafeMutableBufferPointer { pointer in
+                while remaining > 0 {
+                    let n = min(remaining, slice)
+                    _ = renderer.render(into: pointer.baseAddress!, frameCount: n)
+                    remaining -= n
+                }
+            }
+        }
+        run(Int(2 * options.sampleRate)) // settle past the fade-in
+        // Best of five runs, to keep other work on the machine out of the figure.
+        var perSample = Double.infinity
+        for _ in 0 ..< 5 {
+            let start = DispatchTime.now().uptimeNanoseconds
+            run(frames / 5)
+            perSample = min(perSample, Double(DispatchTime.now().uptimeNanoseconds - start) / Double(frames / 5))
+        }
+        totalNs += perSample
+        let name = preset.rawValue.padding(toLength: 14, withPad: " ", startingAt: 0)
+        print("\(name) \(format(perSample, 1).padding(toLength: 11, withPad: " ", startingAt: 0)) \(format(1e9 / (perSample * options.sampleRate), 0))")
+    }
+    print("mean           \(format(totalNs / Double(options.presets.count), 1))")
+    exit(0)
+}
 
 if CommandLine.arguments.contains("--predict") {
     for preset in options.presets {
