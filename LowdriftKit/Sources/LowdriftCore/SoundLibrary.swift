@@ -26,9 +26,17 @@ public final class SoundLibrary {
     }
 
     /// The main screen's cards: favorites first, then the rest, each group A to Z.
-    public var mainScreenPresets: [Preset] {
-        Preset.alphabetical(visible.intersection(favorites))
-            + Preset.alphabetical(visible.subtracting(favorites))
+    public var mainScreenPresets: [Preset] { mainScreenPresets(selected: nil) }
+
+    /// The main screen's cards with the selected sound always among them, even
+    /// if it is hidden (hidden in Settings while selected, or chosen through
+    /// Shortcuts), so what is playing always has a card. Its card goes once
+    /// another sound is selected.
+    public func mainScreenPresets(selected: Preset?) -> [Preset] {
+        var shown = visible
+        if let selected { shown.insert(selected) }
+        return Preset.alphabetical(shown.intersection(favorites))
+            + Preset.alphabetical(shown.subtracting(favorites))
     }
 
     /// Every sound A to Z, for the list in Settings.

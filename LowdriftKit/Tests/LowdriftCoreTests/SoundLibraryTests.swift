@@ -122,4 +122,25 @@ final class SoundLibraryTests: XCTestCase {
             XCTAssertEqual(makeLibrary().mainScreenPresets, [.deskFan, .softFan])
         }
     }
+
+    nonisolated func testSelectedSoundAlwaysHasACard() {
+        onMainActor {
+            let library = makeLibrary()
+            XCTAssertFalse(library.isVisible(.ceilingFan))
+            // Chosen through Shortcuts while hidden: shown in A to Z order.
+            XCTAssertEqual(library.mainScreenPresets(selected: .ceilingFan),
+                           [.basementAC, .bedroomFan, .boxFan, .ceilingFan, .deepDrift, .softFan, .towerFan])
+            XCTAssertFalse(library.isVisible(.ceilingFan), "Showing it for now doesn't change the saved list")
+
+            // Hidden in Settings while selected: it keeps its card until another is chosen.
+            library.setVisible(.boxFan, false)
+            XCTAssertTrue(library.mainScreenPresets(selected: .boxFan).contains(.boxFan))
+            XCTAssertFalse(library.mainScreenPresets(selected: .softFan).contains(.boxFan))
+
+            // A visible selection is not listed twice; a favorite stays pinned.
+            library.setFavorite(.softFan, true)
+            XCTAssertEqual(library.mainScreenPresets(selected: .softFan),
+                           [.softFan, .basementAC, .bedroomFan, .deepDrift, .towerFan])
+        }
+    }
 }

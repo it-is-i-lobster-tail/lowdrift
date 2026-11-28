@@ -221,6 +221,37 @@ final class PlaybackControllerTests: XCTestCase {
         }
     }
 
+    nonisolated func testSliderDragIsHeardLiveAndSavedOnceOnRelease() {
+        onMainActor {
+            let controller = makeController()
+            let saved = { SettingsStore(storage: self.storage).controls(for: .basementAC).depth }
+            let shipping = Preset.basementAC.defaultControls.depth
+            controller.beginEditingControls()
+            controller.setDepth(20)
+            controller.setDepth(25)
+            XCTAssertEqual(output.sound?.controls.depth, 25, "Heard while dragging")
+            XCTAssertEqual(saved(), shipping, "Not saved mid-drag")
+            controller.endEditingControls()
+            XCTAssertEqual(saved(), 25)
+
+            // A drag cut short by switching sounds is saved for the sound it changed.
+            controller.beginEditingControls()
+            controller.setDepth(10)
+            controller.select(.softFan)
+            XCTAssertEqual(saved(), 10)
+            controller.endEditingControls()
+            XCTAssertEqual(SettingsStore(storage: storage).controls(for: .softFan), Preset.softFan.defaultControls)
+
+            // Reset during a drag wins over the held edit.
+            controller.select(.basementAC)
+            controller.beginEditingControls()
+            controller.setDepth(5)
+            controller.resetToDefault()
+            controller.endEditingControls()
+            XCTAssertEqual(saved(), shipping)
+        }
+    }
+
     nonisolated func testInterruptionStopsTheEngineOutright() {
         onMainActor {
             let controller = makeController()
