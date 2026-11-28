@@ -148,4 +148,17 @@ final class SoundListSettingsTests: XCTestCase {
         XCTAssertEqual(reopened.visiblePresets, [.windowAC, .bedroomFan])
         XCTAssertEqual(reopened.favoritePresets, [.windowAC])
     }
+
+    func testUpdatingKeepsTheSelectedSoundOnTheMainScreen() {
+        // A version before sound visibility showed every sound: someone listening
+        // to one outside the default six must still find its card after updating.
+        let storage = InMemoryStorage()
+        SettingsStore(storage: storage).selectedPreset = .ceilingFan
+        let store = SettingsStore(storage: storage)
+        XCTAssertEqual(store.visiblePresets, Preset.defaultVisible.union([.ceilingFan]))
+
+        // A saved choice is used as is, even if it leaves the selection out.
+        store.visiblePresets = [.boxFan]
+        XCTAssertEqual(SettingsStore(storage: storage).visiblePresets, [.boxFan])
+    }
 }

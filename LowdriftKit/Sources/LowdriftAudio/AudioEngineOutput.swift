@@ -26,6 +26,15 @@ public final class AudioEngineOutput: AudioOutput {
 
     public var isRunning: Bool { engine.isRunning }
 
+    /// Whether a configuration-change notification came from the engine in use.
+    /// An engine that was already replaced can still have one queued; acting on
+    /// it would needlessly restart (and audibly re-fade) the healthy new engine.
+    /// A notification without an engine is treated as current, to be safe.
+    public func isCurrentEngine(_ source: ObjectIdentifier?) -> Bool {
+        guard let source else { return true }
+        return source == ObjectIdentifier(engine)
+    }
+
     public func setSound(_ preset: Preset, controls: SoundControls) {
         renderer.setSound(
             preset.soundProfile,

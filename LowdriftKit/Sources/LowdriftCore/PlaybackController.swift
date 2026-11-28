@@ -17,12 +17,13 @@ public protocol AudioOutput: AnyObject {
     /// Activates the audio session if needed, starts the engine and fades in.
     func start() throws
 
-    /// Fades to silence and then stops the engine and releases the audio session.
+    /// Fades to silence and then stops the engine. The audio session stays
+    /// active, so a later Play from the Lock Screen or Shortcuts starts at once.
     /// `fade: false` uses a very short fade (headphones removed, interruptions).
     func stop(fade: Bool)
 
     /// Rebuilds the engine after the system stopped it underneath us (hardware
-    /// configuration change, media services reset). Leaves it stopped.
+    /// configuration change, media services reset, interruption). Leaves it stopped.
     func resetAfterSystemStop()
 }
 
@@ -156,11 +157,13 @@ public final class PlaybackController {
     // MARK: - System events
 
     /// A call, Siri, an alarm or another app took the audio session. The system
-    /// has already silenced the engine.
+    /// has already silenced the engine, so it is stopped outright rather than
+    /// faded: a fade can't finish on a halted engine, and a short interruption
+    /// that ended before the fade's stop would leave Play showing over silence.
     public func interruptionBegan() {
         guard isPlaying else { return }
         resumeAfterInterruption = true
-        output.stop(fade: false)
+        output.resetAfterSystemStop()
         isPlaying = false
         onStateChange?()
     }

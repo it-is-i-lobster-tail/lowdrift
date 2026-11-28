@@ -221,6 +221,20 @@ final class PlaybackControllerTests: XCTestCase {
         }
     }
 
+    nonisolated func testInterruptionStopsTheEngineOutright() {
+        onMainActor {
+            let controller = makeController()
+            controller.play()
+            controller.interruptionBegan()
+            XCTAssertEqual(output.resetCount, 1, "The system halted the engine; a fade could never finish")
+            XCTAssertEqual(output.stops, [])
+            XCTAssertFalse(output.isRunning)
+            controller.interruptionEnded(shouldResume: true)
+            XCTAssertEqual(output.startCount, 2, "Resuming starts a fresh engine")
+            XCTAssertTrue(controller.isPlaying)
+        }
+    }
+
     nonisolated func testHeadphonesRemovedPauses() {
         onMainActor {
             let controller = makeController()
