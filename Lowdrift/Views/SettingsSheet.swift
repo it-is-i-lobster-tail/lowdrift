@@ -117,7 +117,7 @@ private struct SoundsSettingsView: View {
             } header: {
                 Text("Show on main screen")
             } footer: {
-                Text("Turn on the sounds you want to see. Tap the heart to make a sound a favorite: favorites are pinned to the top, and the rest are sorted A to Z.")
+                Text("Turn on the sounds you want to see. Tap the heart to make a sound a favorite: favorites are pinned to the top, and the rest are sorted A to Z. The sound you have selected always keeps its card.")
             }
         }
         .navigationTitle("Sounds")

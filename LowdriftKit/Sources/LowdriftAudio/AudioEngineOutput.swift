@@ -6,7 +6,8 @@ import LowdriftDSP
 /// Plays the procedural renderer through AVAudioEngine.
 ///
 /// The engine only runs while sound is wanted: after a pause fade finishes it is
-/// stopped, so a paused Lowdrift does no audio work at all. The graph is a single
+/// stopped and the audio session released (letting an app Lowdrift interrupted
+/// resume), so a paused Lowdrift does no audio work at all. The graph is a single
 /// source node at the hardware sample rate feeding the main mixer. It carries the
 /// mono sound on both channels (or one, on a mono route).
 @MainActor
@@ -25,6 +26,15 @@ public final class AudioEngineOutput: AudioOutput {
     }
 
     public var isRunning: Bool { engine.isRunning }
+
+    /// Whether a configuration-change notification came from the engine in use.
+    /// An engine that was already replaced can still have one queued; acting on
+    /// it would needlessly restart (and audibly re-fade) the healthy new engine.
+    /// A notification without an engine is treated as current, to be safe.
+    public func isCurrentEngine(_ source: ObjectIdentifier?) -> Bool {
+        guard let source else { return true }
+        return source == ObjectIdentifier(engine)
+    }
 
     public func setSound(_ preset: Preset, controls: SoundControls) {
         renderer.setSound(
@@ -80,6 +90,9 @@ public final class AudioEngineOutput: AudioOutput {
             guard !Task.isCancelled, let self else { return }
             self.engine.stop()
             self.stopTask = nil
+            // Give the audio back so an app Lowdrift interrupted (a podcast,
+            // music) can offer to resume. The next Play activates it again.
+            try? self.session.setActive(false, options: .notifyOthersOnDeactivation)
         }
     }
 

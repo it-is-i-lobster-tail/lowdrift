@@ -80,7 +80,7 @@ struct MainView: View {
                     .padding(.bottom, 12)
 
                 PresetGrid(
-                    presets: library.mainScreenPresets,
+                    presets: library.mainScreenPresets(selected: controller.selectedPreset),
                     favorites: library.favorites,
                     selected: controller.selectedPreset,
                     select: { controller.select($0) },

@@ -17,12 +17,13 @@ public protocol AudioOutput: AnyObject {
     /// Activates the audio session if needed, starts the engine and fades in.
     func start() throws
 
-    /// Fades to silence and then stops the engine and releases the audio session.
+    /// Fades to silence, then stops the engine and releases the audio session
+    /// so an app Lowdrift interrupted can resume.
     /// `fade: false` uses a very short fade (headphones removed, interruptions).
     func stop(fade: Bool)
 
     /// Rebuilds the engine after the system stopped it underneath us (hardware
-    /// configuration change, media services reset). Leaves it stopped.
+    /// configuration change, media services reset, interruption). Leaves it stopped.
     func resetAfterSystemStop()
 }
 
@@ -66,6 +67,10 @@ public final class PlaybackController {
     private let output: AudioOutput
     /// Set when an interruption stopped audio the user was listening to.
     @ObservationIgnored private var resumeAfterInterruption = false
+    /// While a slider is being dragged, changes are heard live but saved once,
+    /// when it is let go, instead of on every step of the drag.
+    @ObservationIgnored private var isEditingControls = false
+    @ObservationIgnored private var hasUnsavedControls = false
 
     public init(store: SettingsStore, output: AudioOutput) {
         self.store = store
@@ -98,6 +103,7 @@ public final class PlaybackController {
     /// Selects a preset. If playing, the sound crossfades; if paused, it stays paused.
     public func select(_ preset: Preset) {
         guard preset != selectedPreset else { return }
+        saveControlsIfNeeded()
         selectedPreset = preset
         store.selectedPreset = preset
         controls = store.controls(for: preset)
@@ -137,8 +143,20 @@ public final class PlaybackController {
         set { setDrift(newValue) }
     }
 
+    /// A slider drag began: keep applying changes live, but hold the save.
+    public func beginEditingControls() {
+        isEditingControls = true
+    }
+
+    /// A slider drag ended (or the sheet closed): save what changed, once.
+    public func endEditingControls() {
+        isEditingControls = false
+        saveControlsIfNeeded()
+    }
+
     /// Restores the selected preset's shipping values (only that preset).
     public func resetToDefault() {
+        hasUnsavedControls = false
         store.resetControls(for: selectedPreset)
         controls = selectedPreset.defaultControls
         output.setSound(selectedPreset, controls: controls)
@@ -156,11 +174,13 @@ public final class PlaybackController {
     // MARK: - System events
 
     /// A call, Siri, an alarm or another app took the audio session. The system
-    /// has already silenced the engine.
+    /// has already silenced the engine, so it is stopped outright rather than
+    /// faded: a fade can't finish on a halted engine, and a short interruption
+    /// that ended before the fade's stop would leave Play showing over silence.
     public func interruptionBegan() {
         guard isPlaying else { return }
         resumeAfterInterruption = true
-        output.stop(fade: false)
+        output.resetAfterSystemStop()
         isPlaying = false
         onStateChange?()
     }
@@ -208,8 +228,15 @@ public final class PlaybackController {
         change(&next)
         guard next != controls else { return }
         controls = next
-        store.setControls(next, for: selectedPreset)
         output.setSound(selectedPreset, controls: next)
+        hasUnsavedControls = true
+        if !isEditingControls { saveControlsIfNeeded() }
+    }
+
+    private func saveControlsIfNeeded() {
+        guard hasUnsavedControls else { return }
+        hasUnsavedControls = false
+        store.setControls(controls, for: selectedPreset)
     }
 
     private func startOutput() {

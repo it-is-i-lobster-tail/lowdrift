@@ -38,9 +38,13 @@ public final class AudioSessionCoordinator {
                 guard let self else { return }
                 MainActor.assumeIsolated { self.controller.mediaServicesWereReset() }
             },
-            center.addObserver(forName: .AVAudioEngineConfigurationChange, object: nil, queue: .main) { [weak self] _ in
+            center.addObserver(forName: .AVAudioEngineConfigurationChange, object: nil, queue: .main) { [weak self] note in
+                let source = (note.object as AnyObject?).map(ObjectIdentifier.init)
                 guard let self else { return }
-                MainActor.assumeIsolated { self.controller.engineConfigurationChanged() }
+                MainActor.assumeIsolated {
+                    guard self.output.isCurrentEngine(source) else { return }
+                    self.controller.engineConfigurationChanged()
+                }
             },
         ]
     }

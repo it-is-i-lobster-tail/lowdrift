@@ -12,7 +12,12 @@ import LDAtomics
 ///   callback and keeps all DSP state inline.
 public final class NoiseRenderer: @unchecked Sendable {
     private let control = ControlWords()
-    private var core: RenderCore
+    /// Render state lives in memory allocated once here rather than in a stored
+    /// property: mutating a class's stored property makes Swift record a dynamic
+    /// exclusivity access on every call, and the runtime lazily allocates that
+    /// bookkeeping the first time each new thread (each new audio I/O thread)
+    /// does so. Through a pointer, the render call touches only plain memory.
+    private let core: UnsafeMutablePointer<RenderCore>
 
     /// - Parameters:
     ///   - sampleRate: Initial hardware rate. Update with `setSampleRate` on route changes.
@@ -26,7 +31,8 @@ public final class NoiseRenderer: @unchecked Sendable {
         precondition(characters.count == SoundProfile.allCases.count, "One character per profile")
         let resolvedSeed = seed ?? UInt64.random(in: 1 ... UInt64.max)
         let rate = Float(Self.sanitizedSampleRate(sampleRate))
-        core = RenderCore(sampleRate: rate, characters: characters, seed: resolvedSeed, control: control)
+        core = .allocate(capacity: 1)
+        core.initialize(to: RenderCore(sampleRate: rate, characters: characters, seed: resolvedSeed, control: control))
         control.storeFloat(rate, .sampleRate)
         control.storeFloat(0.5, .depth)
         control.storeFloat(0.5, .airflow)
@@ -37,6 +43,11 @@ public final class NoiseRenderer: @unchecked Sendable {
         control.storeFloat(Self.defaultFadeIn, .fadeInSeconds)
         control.storeFloat(Self.defaultFadeOut, .fadeOutSeconds)
         control.bumpVersion()
+    }
+
+    deinit {
+        core.deinitialize(count: 1)
+        core.deallocate()
     }
 
     // Computed constants rather than stored globals, so the render thread never
@@ -106,7 +117,7 @@ public final class NoiseRenderer: @unchecked Sendable {
     /// buffer is pure silence (lets the caller set AVAudioSourceNode's isSilence).
     @discardableResult
     public func render(into buffer: UnsafeMutablePointer<Float>, frameCount: Int) -> Bool {
-        core.render(into: buffer, frameCount: frameCount)
+        core.pointee.render(into: buffer, frameCount: frameCount)
     }
 
     // MARK: - Analysis (non-real-time; tests and tools)
@@ -428,12 +439,22 @@ struct RenderCore {
     }
 
     /// Ends a finished crossfade once the outgoing voice has ramped to zero.
+    ///
+    /// Both levels are snapped (step cleared) because neither is ramped again
+    /// until the next crossfade but both keep ticking: any rounding left in the
+    /// incoming voice's last step would otherwise accumulate for hours.
     private mutating func finishCrossfadeIfDone() {
         guard crossfading, crossfadeProgress >= 1 else { return }
         let outgoingSilent = activeIsA ? voiceB.level.value <= 1e-6 : voiceA.level.value <= 1e-6
         if outgoingSilent {
             crossfading = false
-            if activeIsA { voiceB.level.snap(to: 0) } else { voiceA.level.snap(to: 0) }
+            if activeIsA {
+                voiceA.level.snap(to: 1)
+                voiceB.level.snap(to: 0)
+            } else {
+                voiceB.level.snap(to: 1)
+                voiceA.level.snap(to: 0)
+            }
         }
     }
 

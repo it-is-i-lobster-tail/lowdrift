@@ -54,10 +54,18 @@ public final class SettingsStore {
 
     /// Sounds shown on the main screen. The default six on first launch, and
     /// again if the saved list is missing, damaged or names no current sound.
+    /// Whenever the default is used, a sound already selected is shown too, so
+    /// someone updating from a version that showed every sound keeps a card
+    /// for the sound they were listening to.
     public var visiblePresets: Set<Preset> {
         get {
             let stored = Self.presets(storage.object(forKey: Key.visiblePresets))
-            guard let stored, !stored.isEmpty else { return Preset.defaultVisible }
+            guard let stored, !stored.isEmpty else {
+                guard let raw = storage.object(forKey: Key.selectedPreset) as? String,
+                      let selected = Preset(rawValue: raw)
+                else { return Preset.defaultVisible }
+                return Preset.defaultVisible.union([selected])
+            }
             return stored
         }
         set { storage.set(Self.rawValues(newValue), forKey: Key.visiblePresets) }

@@ -9,29 +9,37 @@ struct CustomizeSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    private func editingChanged(_ isEditing: Bool) {
+        if isEditing {
+            controller.beginEditingControls()
+        } else {
+            controller.endEditingControls()
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     SoundSlider(
                         title: "Depth", low: "Light", high: "Deep",
-                        value: $controller.depth
+                        value: $controller.depth, onEditingChanged: editingChanged
                     )
                     SoundSlider(
                         title: "Airflow", low: "Gentle", high: "Strong",
-                        value: $controller.airflow
+                        value: $controller.airflow, onEditingChanged: editingChanged
                     )
                     SoundSlider(
                         title: "Hum", low: "None", high: "More",
-                        value: $controller.hum
+                        value: $controller.hum, onEditingChanged: editingChanged
                     )
                     SoundSlider(
                         title: "Flutter", low: "Smooth", high: "Choppy",
-                        value: $controller.flutter
+                        value: $controller.flutter, onEditingChanged: editingChanged
                     )
                     SoundSlider(
                         title: "Drift", low: "Steady", high: "Wandering",
-                        value: $controller.drift
+                        value: $controller.drift, onEditingChanged: editingChanged
                     )
 
                     Button {
@@ -84,6 +92,8 @@ struct CustomizeSheet: View {
             }
         }
         .tint(Theme.accent)
+        // A drag cut short by the sheet closing still gets saved.
+        .onDisappear { controller.endEditingControls() }
         // Opens full height so all five controls and Reset to default are in view.
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -96,6 +106,7 @@ private struct SoundSlider: View {
     let low: String
     let high: String
     @Binding var value: Double
+    let onEditingChanged: (Bool) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -105,6 +116,8 @@ private struct SoundSlider: View {
                 .accessibilityHidden(true)
             Slider(value: $value, in: SoundControls.range) {
                 Text(title)
+            } onEditingChanged: { isEditing in
+                onEditingChanged(isEditing)
             }
             .accessibilityValue(spokenValue)
             HStack {

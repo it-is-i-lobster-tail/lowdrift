@@ -29,6 +29,24 @@ enum SoundOption: String, AppEnum {
         .bedroomFan: "Bedroom Fan",
     ]
 
+    /// Every sound must be offered to Shortcuts: this switch covers every
+    /// `Preset`, so adding a sound without a case here fails the build.
+    /// (`caseDisplayRepresentations` has to stay a literal for App Intents.)
+    init(_ preset: Preset) {
+        switch preset {
+        case .softFan: self = .softFan
+        case .boxFan: self = .boxFan
+        case .basementAC: self = .basementAC
+        case .towerFan: self = .towerFan
+        case .deepDrift: self = .deepDrift
+        case .ceilingFan: self = .ceilingFan
+        case .windowAC: self = .windowAC
+        case .cabinAir: self = .cabinAir
+        case .deskFan: self = .deskFan
+        case .bedroomFan: self = .bedroomFan
+        }
+    }
+
     var preset: Preset {
         switch self {
         case .softFan: return .softFan
